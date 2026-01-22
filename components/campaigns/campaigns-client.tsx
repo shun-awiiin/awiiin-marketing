@@ -1,0 +1,210 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Search, MoreHorizontal, Eye, Trash2, Send, Pause, Play } from "lucide-react";
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  scheduled_at: string | null;
+  created_at: string;
+  templates: { name: string } | null;
+}
+
+interface CampaignsClientProps {
+  campaigns: Campaign[];
+}
+
+export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClientProps) {
+  const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
+  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
+
+  const filteredCampaigns = campaigns.filter((campaign) =>
+    campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("campaigns").delete().eq("id", id);
+    if (!error) {
+      setCampaigns(campaigns.filter((c) => c.id !== id));
+    }
+  };
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    const { error } = await supabase
+      .from("campaigns")
+      .update({ status: newStatus })
+      .eq("id", id);
+
+    if (!error) {
+      setCampaigns(
+        campaigns.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+      );
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      draft: { label: "下書き", className: "bg-muted text-muted-foreground" },
+      scheduled: { label: "予約済み", className: "bg-blue-100 text-blue-700" },
+      sending: { label: "送信中", className: "bg-yellow-100 text-yellow-700" },
+      completed: { label: "完了", className: "bg-green-100 text-green-700" },
+      paused: { label: "一時停止", className: "bg-orange-100 text-orange-700" },
+    };
+    const config = statusConfig[status] || statusConfig.draft;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.className}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">キャンペーン</h1>
+          <p className="text-muted-foreground">
+            メール配信キャンペーンを管理
+          </p>
+        </div>
+        <Link href="/dashboard/campaigns/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            新規キャンペーン
+          </Button>
+        </Link>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="キャンペーン名で検索..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>キャンペーン名</TableHead>
+              <TableHead>テンプレート</TableHead>
+              <TableHead>ステータス</TableHead>
+              <TableHead>予定日時</TableHead>
+              <TableHead>作成日</TableHead>
+              <TableHead className="w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredCampaigns.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Send className="h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">キャンペーンがありません</p>
+                    <Link href="/dashboard/campaigns/new">
+                      <Button variant="outline" size="sm">
+                        新規作成
+                      </Button>
+                    </Link>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCampaigns.map((campaign) => (
+                <TableRow key={campaign.id}>
+                  <TableCell className="font-medium">{campaign.name}</TableCell>
+                  <TableCell>{campaign.templates?.name || "-"}</TableCell>
+                  <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                  <TableCell>
+                    {campaign.scheduled_at
+                      ? new Date(campaign.scheduled_at).toLocaleString("ja-JP")
+                      : "-"}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(campaign.created_at).toLocaleDateString("ja-JP")}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/campaigns/${campaign.id}`}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            詳細
+                          </Link>
+                        </DropdownMenuItem>
+                        {campaign.status === "draft" && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(campaign.id, "scheduled")}
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            送信開始
+                          </DropdownMenuItem>
+                        )}
+                        {campaign.status === "sending" && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(campaign.id, "paused")}
+                          >
+                            <Pause className="mr-2 h-4 w-4" />
+                            一時停止
+                          </DropdownMenuItem>
+                        )}
+                        {campaign.status === "paused" && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(campaign.id, "sending")}
+                          >
+                            <Play className="mr-2 h-4 w-4" />
+                            再開
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(campaign.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          削除
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
