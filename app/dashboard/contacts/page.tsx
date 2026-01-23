@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { ContactsClient } from "@/components/contacts/contacts-client";
 
-export default async function ContactsPage() {
+const PAGE_SIZE = 100;
+
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -9,7 +15,11 @@ export default async function ContactsPage() {
 
   if (!user) return null;
 
-  const [contactsResult, tagsResult] = await Promise.all([
+  const currentPage = Math.max(1, Number(searchParams?.page || 1));
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE - 1;
+
+  const [contactsResult, tagsResult, countResult] = await Promise.all([
     supabase
       .from("contacts")
       .select(
@@ -21,8 +31,13 @@ export default async function ContactsPage() {
       `
       )
       .eq("user_id", user.id)
+      .range(start, end)
       .order("created_at", { ascending: false }),
     supabase.from("tags").select("*").eq("user_id", user.id).order("name"),
+    supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
   ]);
 
   const contacts =
@@ -36,6 +51,9 @@ export default async function ContactsPage() {
       initialContacts={contacts}
       tags={tagsResult.data ?? []}
       userId={user.id}
+      totalCount={countResult.count ?? 0}
+      currentPage={currentPage}
+      pageSize={PAGE_SIZE}
     />
   );
 }

@@ -59,12 +59,18 @@ interface ContactsClientProps {
   initialContacts: Contact[];
   tags: { id: string; name: string; color: string }[];
   userId: string;
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 export function ContactsClient({
   initialContacts,
   tags,
   userId,
+  totalCount,
+  currentPage,
+  pageSize,
 }: ContactsClientProps) {
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,6 +93,7 @@ export function ContactsClient({
       contact.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.company?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const handleAddContact = async () => {
     if (!newContact.email) return;
@@ -134,10 +141,15 @@ export function ContactsClient({
   };
 
   const toggleSelectAll = () => {
-    if (selectedContacts.length === filteredContacts.length) {
-      setSelectedContacts([]);
+    const pageIds = filteredContacts.map((c) => c.id);
+    const allSelectedOnPage = pageIds.every((id) =>
+      selectedContacts.includes(id)
+    );
+    if (allSelectedOnPage) {
+      setSelectedContacts(selectedContacts.filter((id) => !pageIds.includes(id)));
     } else {
-      setSelectedContacts(filteredContacts.map((c) => c.id));
+      const next = new Set([...selectedContacts, ...pageIds]);
+      setSelectedContacts(Array.from(next));
     }
   };
 
@@ -185,7 +197,7 @@ export function ContactsClient({
         <div>
           <h1 className="text-2xl font-bold">連絡先</h1>
           <p className="text-muted-foreground">
-            {contacts.length}件の連絡先を管理中
+            全{totalCount}件中{filteredContacts.length}件表示
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -321,7 +333,7 @@ export function ContactsClient({
                 <Checkbox
                   checked={
                     filteredContacts.length > 0 &&
-                    selectedContacts.length === filteredContacts.length
+                    filteredContacts.every((c) => selectedContacts.includes(c.id))
                   }
                   onCheckedChange={toggleSelectAll}
                 />
@@ -407,6 +419,31 @@ export function ContactsClient({
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            ページ {currentPage} / {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => router.push(`/dashboard/contacts?page=${currentPage - 1}`)}
+            >
+              前へ
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={() => router.push(`/dashboard/contacts?page=${currentPage + 1}`)}
+            >
+              次へ
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
