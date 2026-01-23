@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isValidEmail } from '@/lib/email/template-renderer';
 import { quickValidateEmail } from '@/lib/validation/email-validator';
-import type { EmailRiskLevel } from '@/lib/types/deliverability';
 
 // App Router config for large file uploads and long processing
 export const maxDuration = 300; // 5 minutes for Vercel Pro, 60 for Hobby
@@ -197,8 +196,6 @@ export async function POST(request: NextRequest) {
       first_name: string | null;
       company: string | null;
       status: 'active';
-      validation_status?: EmailRiskLevel;
-      validated_at?: string;
     }> = [];
     
     const toUpdate: Array<{
@@ -263,19 +260,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Validation (quick only for performance)
-      let validationStatus: EmailRiskLevel | undefined;
-      let validatedAt: string | undefined;
-
       if (validateEmails) {
-        const quickResult = quickValidateEmail(email);
-        if (!quickResult.valid) {
-          validationStatus = 'critical';
-        } else if (quickResult.isRoleBased) {
-          validationStatus = 'medium';
-        } else {
-          validationStatus = 'low';
-        }
-        validatedAt = new Date().toISOString();
+        quickValidateEmail(email);
       }
 
       // Get tag IDs
@@ -308,8 +294,6 @@ export async function POST(request: NextRequest) {
           first_name: firstName,
           company,
           status: 'active',
-          validation_status: validationStatus,
-          validated_at: validatedAt
         });
       }
     }
