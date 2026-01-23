@@ -34,19 +34,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
 
-    // Parse CSV
+    // Parse CSV (handle quoted newlines)
     const text = await file.text();
     console.log('File size:', text.length, 'bytes');
     
-    const lines = text.split('\n').filter(line => line.trim());
-    console.log('Total lines:', lines.length);
+    const rows = parseCSV(text);
+    console.log('Total rows:', rows.length);
 
-    if (lines.length < 2) {
+    if (rows.length < 2) {
       return NextResponse.json({ error: 'CSV file must have header and at least one data row' }, { status: 400 });
     }
 
     // Parse header
-    const header = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+    const header = rows[0].map(normalizeHeader);
     console.log('Header columns:', header.length, 'First 5:', header.slice(0, 5));
     
     // Support multiple email column names (including HubSpot format)
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     console.log('Email index:', emailIndex, 'FirstName index:', firstNameIndex, 'LastName index:', lastNameIndex);
     
     // Debug: show first 3 data rows parsed
-    for (let i = 1; i <= Math.min(3, lines.length - 1); i++) {
-      const testValues = parseCSVLine(lines[i]);
+    for (let i = 1; i <= Math.min(3, rows.length - 1); i++) {
+      const testValues = rows[i];
       console.log(`Row ${i} parsed:`, {
         totalColumns: testValues.length,
         email: testValues[emailIndex] || '(empty)',
@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
     // First pass: collect all unique tag names to pre-create them
     const allTagNames = new Set<string>();
     
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i]);
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i];
       
       let tagsStr = tagsIndex >= 0 ? values[tagsIndex]?.trim() || '' : '';
       
@@ -209,8 +209,8 @@ export async function POST(request: NextRequest) {
     const seenEmails = new Set<string>();
     let skipped = 0;
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i]);
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i];
       const email = values[emailIndex]?.trim().toLowerCase();
 
       if (!email) {
@@ -300,7 +300,7 @@ export async function POST(request: NextRequest) {
 
     // Summary before batch operations
     const summary = {
-      totalDataRows: lines.length - 1,
+      totalDataRows: rows.length - 1,
       toInsert: toInsert.length,
       toUpdate: toUpdate.length,
       skippedDuplicates: skipped,
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
     
     // Sanity check
     const accounted = toInsert.length + toUpdate.length + skipped + errors.length;
-    console.log(`Accounted rows: ${accounted} / ${lines.length - 1} (diff: ${lines.length - 1 - accounted})`);
+    console.log(`Accounted rows: ${accounted} / ${rows.length - 1} (diff: ${rows.length - 1 - accounted})`);
     
     let created = 0;
     const totalBatches = Math.ceil(toInsert.length / BATCH_SIZE);
@@ -410,7 +410,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        total: lines.length - 1,
+        total: rows.length - 1,
         created,
         updated,
         skipped: skipped + skippedUpdates, // Include skipped updates
@@ -427,32 +427,55 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Parse CSV line handling quoted values
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
+function normalizeHeader(value: string): string {
+  // Remove BOM if present and normalize casing/spacing
+  const withoutBom = value.replace(/^\uFEFF/, '');
+  return withoutBom.trim().toLowerCase();
+}
+
+// Parse CSV text handling quoted values and newlines
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let current = '';
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
 
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
+      if (inQuotes && text[i + 1] === '"') {
         current += '"';
         i++;
       } else {
         inQuotes = !inQuotes;
       }
     } else if (char === ',' && !inQuotes) {
-      result.push(current);
+      row.push(current);
       current = '';
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && text[i + 1] === '\n') {
+        i++;
+      }
+      row.push(current);
+      current = '';
+      if (row.some((field) => field.trim() !== '')) {
+        rows.push(row);
+      }
+      row = [];
     } else {
       current += char;
     }
   }
 
-  result.push(current);
-  return result;
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    if (row.some((field) => field.trim() !== '')) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
 }
 
 // Generate random tag color
