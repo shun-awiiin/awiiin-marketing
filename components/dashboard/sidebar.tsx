@@ -36,6 +36,9 @@ import {
   ChevronUp,
   Tag,
   Shield,
+  GitBranch,
+  Filter,
+  MessageSquare,
 } from "lucide-react";
 
 const menuItems = [
@@ -48,6 +51,16 @@ const menuItems = [
     title: "キャンペーン",
     icon: Send,
     href: "/dashboard/campaigns",
+  },
+  {
+    title: "シナリオ",
+    icon: GitBranch,
+    href: "/dashboard/scenarios",
+  },
+  {
+    title: "セグメント",
+    icon: Filter,
+    href: "/dashboard/segments",
   },
   {
     title: "連絡先",
@@ -139,6 +152,17 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
           <SidebarGroupLabel>設定</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/dashboard/settings/line"}
+                >
+                  <Link href="/dashboard/settings/line">
+                    <MessageSquare className="size-4" />
+                    <span>LINE連携</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild

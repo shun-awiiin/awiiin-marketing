@@ -329,6 +329,76 @@ export const SUBJECT_VARIANTS = {
 export const DEFAULT_FIRST_NAME = 'ご担当者さま';
 
 // ============================================
+// TEST SEND TYPES
+// ============================================
+
+export interface TestSendRequest {
+  recipient_email: string;
+  include_preview?: boolean;
+  sample_first_name?: string;
+}
+
+export interface TestSendResult {
+  success: boolean;
+  message_id?: string;
+  preview: {
+    subject: string;
+    body_text: string;
+    from: string;
+    to: string;
+  };
+  error?: string;
+}
+
+export const TestSendRequestSchema = z.object({
+  recipient_email: z.string().email('有効なメールアドレスを入力してください'),
+  include_preview: z.boolean().default(true),
+  sample_first_name: z.string().max(50).optional(),
+});
+
+export const TEST_SEND_RATE_LIMIT = {
+  MAX_PER_HOUR: 5,
+  WINDOW_MS: 60 * 60 * 1000, // 1 hour
+} as const;
+
+// ============================================
+// SCHEDULED SEND TYPES
+// ============================================
+
+export type ScheduledJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface ScheduledJob {
+  id: string;
+  campaign_id: string;
+  scheduled_at: string;
+  status: ScheduledJobStatus;
+  attempts: number;
+  last_error: string | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+export interface ScheduledSendResult {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  jobs: Array<{
+    campaign_id: string;
+    status: 'success' | 'failed';
+    error?: string;
+  }>;
+}
+
+// ============================================
+// REALTIME STATS TYPES
+// ============================================
+
+export interface RealtimeStats extends CampaignStats {
+  last_updated: Date;
+  is_connected: boolean;
+}
+
+// ============================================
 // SUPABASE DATABASE TYPES (for client)
 // ============================================
 

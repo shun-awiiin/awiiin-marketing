@@ -35,6 +35,8 @@ import {
   AlertTriangle,
   Mail,
 } from "lucide-react";
+import { TestSendDialog } from "./test-send-dialog";
+import { RealtimeStats } from "./realtime-stats";
 
 interface Campaign {
   id: string;
@@ -152,11 +154,6 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
     }
   };
 
-  const deliveryRate =
-    stats.sent > 0
-      ? (((stats.sent - stats.bounced) / stats.sent) * 100).toFixed(1)
-      : "0";
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -175,6 +172,13 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
           </p>
         </div>
         <div className="flex gap-2">
+          {["draft", "scheduled", "paused"].includes(currentStatus) && (
+            <TestSendDialog
+              campaignId={campaign.id}
+              campaignName={campaign.name}
+              disabled={loading}
+            />
+          )}
           {currentStatus === "draft" && (
             <Button onClick={() => handleStatusChange("sending")} disabled={loading}>
               <Send className="mr-2 h-4 w-4" />
@@ -200,58 +204,11 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">総送信数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">送信完了</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.sent}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">失敗/バウンス</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {stats.failed + stats.bounced}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">到達率</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{deliveryRate}%</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {stats.total > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">送信進捗</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Progress
-              value={((stats.sent + stats.failed + stats.bounced) / stats.total) * 100}
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              {stats.sent + stats.failed + stats.bounced} / {stats.total} 完了
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Real-time Statistics */}
+      <RealtimeStats
+        campaignId={campaign.id}
+        campaignStatus={currentStatus}
+      />
 
       <Tabs defaultValue="messages">
         <TabsList>

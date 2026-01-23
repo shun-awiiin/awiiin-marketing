@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { processOpenEvent, processClickEvent } from '@/lib/engagement/engagement-tracker';
+import {
+  verifySNSSignature,
+  verifySendGridSignature,
+  verifyResendSignature,
+  checkEventIdempotency,
+} from '@/lib/email/webhook-security';
 
 // SNS Message types
 interface SNSMessage {
@@ -67,30 +73,67 @@ interface SESEvent {
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
+    const rawBody = await request.text();
 
     // Handle SNS subscription confirmation
     const snsMessageType = request.headers.get('x-amz-sns-message-type');
 
     if (snsMessageType === 'SubscriptionConfirmation') {
-      const snsMessage = await request.json() as SNSMessage;
+      const snsMessage = JSON.parse(rawBody) as SNSMessage;
+
+      // Verify SNS signature before confirming
+      const isValidSignature = await verifySNSSignature(snsMessage);
+      if (!isValidSignature) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
+
       // Auto-confirm subscription by visiting the SubscribeURL
       if (snsMessage.SubscribeURL) {
         await fetch(snsMessage.SubscribeURL);
-        console.log('SNS subscription confirmed');
       }
       return NextResponse.json({ received: true });
     }
 
     let events: Array<Record<string, unknown>> = [];
+    let provider: 'ses' | 'sendgrid' | 'resend' | 'unknown' = 'unknown';
 
     // Parse based on content type / provider
     if (snsMessageType === 'Notification') {
       // AWS SNS/SES notification
-      const snsMessage = await request.json() as SNSMessage;
+      const snsMessage = JSON.parse(rawBody) as SNSMessage;
+
+      // Verify SNS signature
+      const isValidSignature = await verifySNSSignature(snsMessage);
+      if (!isValidSignature) {
+        return NextResponse.json({ error: 'Invalid SNS signature' }, { status: 401 });
+      }
+
       const sesEvent = JSON.parse(snsMessage.Message) as SESEvent;
       events = [sesEvent as unknown as Record<string, unknown>];
+      provider = 'ses';
     } else if (contentType.includes('application/json')) {
-      const body = await request.json();
+      const body = JSON.parse(rawBody);
+
+      // Detect provider and verify signature
+      if (request.headers.get('x-twilio-email-event-webhook-signature')) {
+        // SendGrid webhook
+        const signature = request.headers.get('x-twilio-email-event-webhook-signature');
+        const timestamp = request.headers.get('x-twilio-email-event-webhook-timestamp');
+
+        if (!verifySendGridSignature(rawBody, signature, timestamp)) {
+          return NextResponse.json({ error: 'Invalid SendGrid signature' }, { status: 401 });
+        }
+        provider = 'sendgrid';
+      } else if (request.headers.get('svix-signature')) {
+        // Resend webhook
+        const signature = request.headers.get('svix-signature');
+
+        if (!verifyResendSignature(rawBody, signature)) {
+          return NextResponse.json({ error: 'Invalid Resend signature' }, { status: 401 });
+        }
+        provider = 'resend';
+      }
+
       // Handle array of events (SendGrid style) or single event (Resend style)
       events = Array.isArray(body) ? body : [body];
     }
@@ -98,12 +141,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient();
 
     for (const event of events) {
-      await processEvent(supabase, event);
+      await processEvent(supabase, event, provider);
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
+  } catch {
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
@@ -113,17 +155,52 @@ export async function POST(request: NextRequest) {
 
 async function processEvent(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
-  event: Record<string, unknown>
+  event: Record<string, unknown>,
+  detectedProvider: 'ses' | 'sendgrid' | 'resend' | 'unknown'
 ) {
   // Detect provider and process accordingly
-  if (event.eventType) {
+  if (event.eventType || detectedProvider === 'ses') {
     // SES event format
-    await processSESEvent(supabase, event as unknown as SESEvent);
-  } else if (event.event) {
+    const sesEvent = event as unknown as SESEvent;
+
+    // Idempotency check
+    const idempotency = await checkEventIdempotency(
+      'ses',
+      sesEvent.mail.messageId,
+      sesEvent.eventType.toLowerCase()
+    );
+    if (idempotency.isDuplicate) {
+      return; // Skip duplicate event
+    }
+
+    await processSESEvent(supabase, sesEvent);
+  } else if (event.event || detectedProvider === 'sendgrid') {
     // SendGrid event format
+    const sgMessageId = event.sg_message_id as string;
+    const eventType = event.event as string;
+
+    // Idempotency check
+    if (sgMessageId && eventType) {
+      const idempotency = await checkEventIdempotency('sendgrid', sgMessageId, eventType);
+      if (idempotency.isDuplicate) {
+        return; // Skip duplicate event
+      }
+    }
+
     await processSendGridEvent(supabase, event);
-  } else if (event.type) {
+  } else if (event.type || detectedProvider === 'resend') {
     // Resend event format
+    const data = event.data as { email_id?: string };
+    const eventType = event.type as string;
+
+    // Idempotency check
+    if (data?.email_id && eventType) {
+      const idempotency = await checkEventIdempotency('resend', data.email_id, eventType);
+      if (idempotency.isDuplicate) {
+        return; // Skip duplicate event
+      }
+    }
+
     await processResendEvent(supabase, event);
   }
 }
@@ -251,7 +328,7 @@ async function processSESEvent(
         await supabase
           .from('messages')
           .update({
-            opened_at: supabase.rpc ? openTimestamp : openTimestamp,
+            opened_at: openTimestamp,
             open_count: 1, // Will be incremented by trigger or manual logic
           })
           .eq('id', message.id)
@@ -280,8 +357,8 @@ async function processSESEvent(
             campaign_id: message.campaign_id,
             occurred_at: openTimestamp,
           });
-        } catch (engagementError) {
-          console.error('Failed to process open engagement:', engagementError);
+        } catch {
+          // Engagement tracking failure should not block webhook processing
         }
       }
       break;
@@ -314,8 +391,8 @@ async function processSESEvent(
             campaign_id: message.campaign_id,
             occurred_at: clickTimestamp,
           });
-        } catch (engagementError) {
-          console.error('Failed to process click engagement:', engagementError);
+        } catch {
+          // Engagement tracking failure should not block webhook processing
         }
       }
       break;
@@ -440,8 +517,8 @@ async function processSendGridEvent(
               campaign_id: msgDetail.campaign_id,
               occurred_at: openTime,
             });
-          } catch (e) {
-            console.error('Failed to process SendGrid open engagement:', e);
+          } catch {
+            // Engagement tracking failure should not block webhook processing
           }
         }
       }
@@ -474,8 +551,8 @@ async function processSendGridEvent(
               campaign_id: msgDetailClick.campaign_id,
               occurred_at: clickTime,
             });
-          } catch (e) {
-            console.error('Failed to process SendGrid click engagement:', e);
+          } catch {
+            // Engagement tracking failure should not block webhook processing
           }
         }
       }
@@ -592,8 +669,8 @@ async function processResendEvent(
               campaign_id: resendMsgOpen.campaign_id,
               occurred_at: openAt,
             });
-          } catch (e) {
-            console.error('Failed to process Resend open engagement:', e);
+          } catch {
+            // Engagement tracking failure should not block webhook processing
           }
         }
       }
@@ -626,8 +703,8 @@ async function processResendEvent(
               campaign_id: resendMsgClick.campaign_id,
               occurred_at: clickAt,
             });
-          } catch (e) {
-            console.error('Failed to process Resend click engagement:', e);
+          } catch {
+            // Engagement tracking failure should not block webhook processing
           }
         }
       }
