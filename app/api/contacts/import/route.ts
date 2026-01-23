@@ -407,8 +407,6 @@ export async function POST(request: NextRequest) {
         .upsert(batch, { onConflict: 'contact_id,tag_id' });
     }
 
-    const skippedUpdates = toUpdate.length > MAX_UPDATES ? toUpdate.length - MAX_UPDATES : 0;
-    
     return NextResponse.json({
       data: {
         total: lines.length - 1,
