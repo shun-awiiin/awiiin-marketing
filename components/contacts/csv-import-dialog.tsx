@@ -29,6 +29,8 @@ interface ImportResult {
   skipped: number;
   invalid: number;
   errors: Array<{ row: number; email: string; reason: string }>;
+  existingInDb?: number;
+  alreadyExisted?: number;
 }
 
 export function CSVImportDialog({
@@ -145,11 +147,17 @@ export function CSVImportDialog({
           <div className="text-center">
             <p className="font-medium">インポート完了</p>
             <div className="mt-2 text-sm text-muted-foreground space-y-1">
-              <p>新規追加: {result.created}件</p>
-              {result.updated > 0 && <p>更新: {result.updated}件</p>}
-              {result.skipped > 0 && <p>スキップ: {result.skipped}件</p>}
+              <p>処理対象: {result.total}件</p>
+              <p className="text-green-600 font-medium">新規追加: {result.created}件</p>
+              <p>更新: {result.updated}件</p>
+              {result.skipped > 0 && <p>CSV内重複: {result.skipped}件</p>}
               {result.invalid > 0 && (
-                <p className="text-orange-600">無効: {result.invalid}件</p>
+                <p className="text-orange-600">無効（メール空など）: {result.invalid}件</p>
+              )}
+              {result.alreadyExisted !== undefined && result.alreadyExisted > 0 && (
+                <p className="text-blue-600 text-xs mt-2">
+                  ※ 既にDB内に存在: {result.alreadyExisted}件
+                </p>
               )}
             </div>
             {result.errors.length > 0 && (

@@ -82,10 +82,28 @@ export async function POST(request: NextRequest) {
 
     console.log('Email index:', emailIndex, 'FirstName index:', firstNameIndex, 'LastName index:', lastNameIndex);
     
+    // Debug: show first 3 data rows parsed
+    for (let i = 1; i <= Math.min(3, lines.length - 1); i++) {
+      const testValues = parseCSVLine(lines[i]);
+      console.log(`Row ${i} parsed:`, {
+        totalColumns: testValues.length,
+        email: testValues[emailIndex] || '(empty)',
+        firstName: testValues[firstNameIndex] || '(empty)',
+      });
+    }
+    
     if (emailIndex === -1) {
       return NextResponse.json({ error: 'CSV must have an "email" or "Eメール" column' }, { status: 400 });
     }
 
+    // Get existing contacts count first
+    const { count: existingCount } = await supabase
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    
+    console.log('Existing contacts in database:', existingCount);
+    
     // Get existing contacts (in batches if needed)
     const existingEmailMap = new Map<string, string>();
     let offset = 0;
@@ -107,6 +125,8 @@ export async function POST(request: NextRequest) {
       if (existingContacts.length < pageSize) break;
       offset += pageSize;
     }
+    
+    console.log('Loaded existing emails:', existingEmailMap.size);
 
     // Get existing tags
     const { data: existingTags } = await supabase
@@ -294,8 +314,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Batch insert new contacts
-    console.log('To insert:', toInsert.length, 'To update:', toUpdate.length, 'Skipped:', skipped, 'Errors:', errors.length);
+    // Summary before batch operations
+    const summary = {
+      totalDataRows: lines.length - 1,
+      toInsert: toInsert.length,
+      toUpdate: toUpdate.length,
+      skippedDuplicates: skipped,
+      invalidEmails: errors.length,
+      existingInDb: existingEmailMap.size,
+    };
+    console.log('Processing summary:', JSON.stringify(summary));
+    
+    // Sanity check
+    const accounted = toInsert.length + toUpdate.length + skipped + errors.length;
+    console.log(`Accounted rows: ${accounted} / ${lines.length - 1} (diff: ${lines.length - 1 - accounted})`);
     
     let created = 0;
     const totalBatches = Math.ceil(toInsert.length / BATCH_SIZE);
@@ -326,10 +358,15 @@ export async function POST(request: NextRequest) {
     
     console.log('Total created:', created);
 
-    // Batch update existing contacts
+    // Batch update existing contacts (limit to avoid timeout)
     let updated = 0;
-    for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
-      const batch = toUpdate.slice(i, i + BATCH_SIZE);
+    const MAX_UPDATES = 1000; // Limit updates to avoid timeout
+    const updatesToProcess = toUpdate.slice(0, MAX_UPDATES);
+    
+    console.log(`Updating ${updatesToProcess.length} of ${toUpdate.length} existing contacts`);
+    
+    for (let i = 0; i < updatesToProcess.length; i += BATCH_SIZE) {
+      const batch = updatesToProcess.slice(i, i + BATCH_SIZE);
       
       // Update each contact (Supabase doesn't support bulk update)
       for (const contact of batch) {
@@ -343,6 +380,11 @@ export async function POST(request: NextRequest) {
 
         if (!error) updated++;
       }
+    }
+    
+    const skippedUpdates = toUpdate.length - updatesToProcess.length;
+    if (skippedUpdates > 0) {
+      console.log(`Skipped ${skippedUpdates} updates to avoid timeout`);
     }
 
     // Batch assign tags
@@ -365,14 +407,19 @@ export async function POST(request: NextRequest) {
         .upsert(batch, { onConflict: 'contact_id,tag_id' });
     }
 
+    const skippedUpdates = toUpdate.length > MAX_UPDATES ? toUpdate.length - MAX_UPDATES : 0;
+    
     return NextResponse.json({
       data: {
         total: lines.length - 1,
         created,
         updated,
-        skipped,
+        skipped: skipped + skippedUpdates, // Include skipped updates
         invalid: errors.length,
         errors: errors.slice(0, 100),
+        // Diagnostic info
+        existingInDb: existingEmailMap.size,
+        alreadyExisted: toUpdate.length,
       }
     });
   } catch (error) {
