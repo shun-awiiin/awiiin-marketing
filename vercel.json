@@ -1,7 +1,6 @@
 {
   "functions": {
     "api/contacts/import": {
-      "maxBodySize": "15mb",
       "maxDuration": 300
     }
   }
