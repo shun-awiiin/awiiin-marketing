@@ -331,6 +331,7 @@ export async function POST(request: NextRequest) {
     
     let created = 0;
     const totalBatches = Math.ceil(toInsert.length / BATCH_SIZE);
+    const insertErrors: Array<{ batch: number; message: string; details?: string }> = [];
     
     for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
@@ -345,6 +346,11 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         console.error(`Batch ${batchNum} insert error:`, error.message, error.details);
+        insertErrors.push({
+          batch: batchNum,
+          message: error.message,
+          details: error.details,
+        });
       } else {
         created += inserted?.length || 0;
         console.log(`Batch ${batchNum} inserted: ${inserted?.length || 0} records`);
@@ -357,6 +363,17 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('Total created:', created);
+    
+    if (insertErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Insert failed',
+          details: insertErrors.slice(0, 3),
+          summary,
+        },
+        { status: 500 }
+      );
+    }
 
     // Batch update existing contacts (limit to avoid timeout)
     let updated = 0;

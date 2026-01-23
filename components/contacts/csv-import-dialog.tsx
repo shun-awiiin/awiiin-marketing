@@ -111,7 +111,16 @@ export function CSVImportDialog({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "インポートに失敗しました");
+        const detailsText = Array.isArray(data.details)
+          ? data.details
+              .map((d: { batch: number; message: string; details?: string }) =>
+                `batch ${d.batch}: ${d.message}${d.details ? ` (${d.details})` : ""}`
+              )
+              .join(" / ")
+          : "";
+        setError(
+          `${data.error || "インポートに失敗しました"}${detailsText ? ` - ${detailsText}` : ""}`
+        );
         setImporting(false);
         return;
       }
