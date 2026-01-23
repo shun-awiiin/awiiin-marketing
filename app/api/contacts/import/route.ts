@@ -4,14 +4,9 @@ import { isValidEmail } from '@/lib/email/template-renderer';
 import { quickValidateEmail } from '@/lib/validation/email-validator';
 import type { EmailRiskLevel } from '@/lib/types/deliverability';
 
-// Increase body size limit for this route
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+// App Router config for large file uploads and long processing
+export const maxDuration = 300; // 5 minutes for Vercel Pro, 60 for Hobby
+export const dynamic = 'force-dynamic';
 
 interface ImportError {
   row: number;
@@ -42,7 +37,10 @@ export async function POST(request: NextRequest) {
 
     // Parse CSV
     const text = await file.text();
+    console.log('File size:', text.length, 'bytes');
+    
     const lines = text.split('\n').filter(line => line.trim());
+    console.log('Total lines:', lines.length);
 
     if (lines.length < 2) {
       return NextResponse.json({ error: 'CSV file must have header and at least one data row' }, { status: 400 });
@@ -50,6 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Parse header
     const header = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+    console.log('Header columns:', header.length, 'First 5:', header.slice(0, 5));
     
     // Support multiple email column names (including HubSpot format)
     const emailIndex = header.findIndex(h => 
@@ -81,6 +80,8 @@ export async function POST(request: NextRequest) {
       h === 'リードステータス' || h === 'lead status'
     );
 
+    console.log('Email index:', emailIndex, 'FirstName index:', firstNameIndex, 'LastName index:', lastNameIndex);
+    
     if (emailIndex === -1) {
       return NextResponse.json({ error: 'CSV must have an "email" or "Eメール" column' }, { status: 400 });
     }
@@ -294,18 +295,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Batch insert new contacts
+    console.log('To insert:', toInsert.length, 'To update:', toUpdate.length, 'Skipped:', skipped, 'Errors:', errors.length);
+    
     let created = 0;
+    const totalBatches = Math.ceil(toInsert.length / BATCH_SIZE);
+    
     for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       const batch = toInsert.slice(i, i + BATCH_SIZE);
+      
+      console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} records)`);
+      
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(batch)
         .select();
 
       if (error) {
-        console.error('Insert error:', error);
+        console.error(`Batch ${batchNum} insert error:`, error.message, error.details);
       } else {
         created += inserted?.length || 0;
+        console.log(`Batch ${batchNum} inserted: ${inserted?.length || 0} records`);
         
         // Update email map with new contacts
         inserted?.forEach(c => {
@@ -313,6 +323,8 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+    
+    console.log('Total created:', created);
 
     // Batch update existing contacts
     let updated = 0;
