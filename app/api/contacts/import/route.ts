@@ -47,13 +47,39 @@ export async function POST(request: NextRequest) {
 
     // Parse header
     const header = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
-    const emailIndex = header.findIndex(h => h === 'email');
-    const firstNameIndex = header.findIndex(h => h === 'firstname' || h === 'first_name' || h === 'name');
-    const companyIndex = header.findIndex(h => h === 'company');
-    const tagsIndex = header.findIndex(h => h === 'tags');
+    
+    // Support multiple email column names (including HubSpot format)
+    const emailIndex = header.findIndex(h => 
+      h === 'email' || h === 'eメール' || h === 'メール' || h === 'メールアドレス' || h === 'e-mail'
+    );
+    
+    // Support multiple first name column names (including HubSpot format)
+    const firstNameIndex = header.findIndex(h => 
+      h === 'firstname' || h === 'first_name' || h === 'name' || h === '名'
+    );
+    
+    // Support last name for HubSpot format
+    const lastNameIndex = header.findIndex(h => h === 'lastname' || h === 'last_name' || h === '姓');
+    
+    // Support multiple company column names (including HubSpot format)
+    const companyIndex = header.findIndex(h => 
+      h === 'company' || h === 'associated company' || h === '会社' || h === '会社名'
+    );
+    
+    const tagsIndex = header.findIndex(h => h === 'tags' || h === 'タグ');
+    
+    // HubSpot specific: Marketing contact status can be used as tag
+    const marketingStatusIndex = header.findIndex(h => 
+      h === 'マーケティング コンタクト ステータス' || h === 'marketing contact status'
+    );
+    
+    // HubSpot specific: Lead status
+    const leadStatusIndex = header.findIndex(h => 
+      h === 'リードステータス' || h === 'lead status'
+    );
 
     if (emailIndex === -1) {
-      return NextResponse.json({ error: 'CSV must have an "email" column' }, { status: 400 });
+      return NextResponse.json({ error: 'CSV must have an "email" or "Eメール" column' }, { status: 400 });
     }
 
     // Get existing contacts
@@ -120,9 +146,37 @@ export async function POST(request: NextRequest) {
       }
       seenEmails.add(email);
 
-      const firstName = firstNameIndex >= 0 ? values[firstNameIndex]?.trim() || null : null;
+      // Handle first name (combine with last name if available for HubSpot format)
+      let firstName = firstNameIndex >= 0 ? values[firstNameIndex]?.trim() || null : null;
+      const lastName = lastNameIndex >= 0 ? values[lastNameIndex]?.trim() || null : null;
+      
+      // If we have both first and last name, combine them (Japanese style: lastName + firstName)
+      if (firstName && lastName) {
+        firstName = `${lastName} ${firstName}`.trim();
+      } else if (!firstName && lastName) {
+        firstName = lastName;
+      }
+      
       const company = companyIndex >= 0 ? values[companyIndex]?.trim() || null : null;
-      const tagsStr = tagsIndex >= 0 ? values[tagsIndex]?.trim() || '' : '';
+      
+      // Collect tags from tags column and HubSpot specific columns
+      let tagsStr = tagsIndex >= 0 ? values[tagsIndex]?.trim() || '' : '';
+      
+      // Add marketing status as tag if present and not empty
+      if (marketingStatusIndex >= 0) {
+        const marketingStatus = values[marketingStatusIndex]?.trim();
+        if (marketingStatus && marketingStatus !== '') {
+          tagsStr = tagsStr ? `${tagsStr},${marketingStatus}` : marketingStatus;
+        }
+      }
+      
+      // Add lead status as tag if present and not empty  
+      if (leadStatusIndex >= 0) {
+        const leadStatus = values[leadStatusIndex]?.trim();
+        if (leadStatus && leadStatus !== '') {
+          tagsStr = tagsStr ? `${tagsStr},${leadStatus}` : leadStatus;
+        }
+      }
 
       // Validate email if enabled (use quick validation for performance)
       let validationStatus: EmailRiskLevel | undefined;

@@ -68,15 +68,15 @@ export function CSVImportDialog({
           return;
         }
 
-        // Check for email column
-        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+        // Check for email column (support HubSpot format)
+        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ''));
         const hasEmail = headers.some((h) =>
-          ["email", "メール", "メールアドレス", "e-mail"].includes(h)
+          ["email", "eメール", "メール", "メールアドレス", "e-mail"].includes(h)
         );
 
         if (!hasEmail) {
           setError(
-            "emailカラムが見つかりません。CSVの最初の行にemailヘッダーを含めてください。"
+            "emailカラムが見つかりません。CSVに「email」または「Eメール」ヘッダーを含めてください。"
           );
           setPreviewCount(0);
           return;
@@ -229,10 +229,10 @@ export function CSVImportDialog({
           </div>
 
           <div className="text-xs text-muted-foreground p-3 bg-muted rounded-lg">
-            <p className="font-medium mb-1">CSVフォーマット:</p>
-            <code className="block">email, firstName, company, tags</code>
-            <code className="block">example@email.com, 太郎, 株式会社A, タグ1,タグ2</code>
-            <p className="mt-2">※tagsカラムで自動的にタグが作成されます</p>
+            <p className="font-medium mb-1">対応フォーマット:</p>
+            <p className="mb-1">・標準: email, firstName, company, tags</p>
+            <p className="mb-1">・HubSpot: Eメール, 名, 姓, Associated Company</p>
+            <p className="mt-2 text-green-600">✓ HubSpotからのエクスポートCSVに対応</p>
           </div>
         </div>
       )}
