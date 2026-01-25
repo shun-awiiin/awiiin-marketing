@@ -187,7 +187,10 @@ export async function POST(
 
       if (insertError) {
         console.error('Message insert error:', insertError);
-        return NextResponse.json({ error: 'Failed to create messages' }, { status: 500 });
+        return NextResponse.json({ 
+          error: `Failed to create messages: ${insertError.message}`,
+          details: insertError
+        }, { status: 500 });
       }
     }
 
