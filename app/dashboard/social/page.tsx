@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Share2, Calendar, BarChart3 } from "lucide-react"
+import { Plus, Share2, Calendar, BarChart3, ShoppingBag } from "lucide-react"
 import { AccountList } from "@/components/social/account-list"
 
 export const metadata = {
@@ -140,6 +140,44 @@ export default async function SocialDashboardPage() {
         </CardHeader>
         <CardContent>
           <AccountList />
+        </CardContent>
+      </Card>
+
+      {/* eBay Tools Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5" />
+                eBay SNS誘導ツール
+              </CardTitle>
+              <CardDescription>
+                eBayバイヤーをSNSフォロワーに変換するためのテンプレートを生成
+              </CardDescription>
+            </div>
+            <Button asChild>
+              <Link href="/dashboard/social/ebay-tools">
+                ツールを開く
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="font-medium">サンキューカード</p>
+              <p className="text-sm text-muted-foreground">商品同梱用の感謝カード</p>
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="font-medium">パッケージインサート</p>
+              <p className="text-sm text-muted-foreground">同梱チラシでフォロー促進</p>
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="font-medium">購入後メッセージ</p>
+              <p className="text-sm text-muted-foreground">発送通知でSNS案内</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
