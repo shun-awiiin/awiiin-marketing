@@ -46,8 +46,8 @@ interface CampaignsClientProps {
   campaigns: Campaign[];
 }
 
-// 削除不可のステータス
-const ACTIVE_STATUSES = ["sending", "queued", "scheduled", "paused"];
+// 削除不可のステータス（送信中・キュー中のみ）
+const ACTIVE_STATUSES = ["sending", "queued"];
 
 export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClientProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);

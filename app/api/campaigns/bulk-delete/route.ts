@@ -6,8 +6,8 @@ const bulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid()).min(1, '削除するキャンペーンを選択してください'),
 });
 
-// 削除不可のステータス
-const ACTIVE_STATUSES = ['sending', 'queued', 'scheduled', 'paused'];
+// 削除不可のステータス（送信中・キュー中のみ）
+const ACTIVE_STATUSES = ['sending', 'queued'];
 
 // POST /api/campaigns/bulk-delete - Bulk delete campaigns
 export async function POST(request: NextRequest) {
