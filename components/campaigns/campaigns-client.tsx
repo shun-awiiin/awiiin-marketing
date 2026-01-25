@@ -114,6 +114,37 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
     }
   };
 
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  const handleStartSend = async (id: string) => {
+    if (sendingId) return; // 既に送信処理中
+    setSendingId(id);
+
+    try {
+      // キューイングAPIを呼び出し
+      const response = await fetch(`/api/campaigns/${id}/queue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        // ステータスを更新
+        setCampaigns(
+          campaigns.map((c) => (c.id === id ? { ...c, status: "queued" } : c))
+        );
+        alert(`送信を開始しました。${result.data.total_messages}件のメッセージがキューに追加されました。`);
+      } else {
+        alert(`送信開始エラー: ${result.error || "不明なエラー"}`);
+      }
+    } catch (error) {
+      alert("送信開始に失敗しました");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
   const toggleSelectAll = () => {
     const pageIds = filteredCampaigns.map((c) => c.id);
     const allSelectedOnPage = pageIds.every((id) => selectedCampaigns.includes(id));
@@ -269,12 +300,13 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
                             詳細
                           </Link>
                         </DropdownMenuItem>
-                        {campaign.status === "draft" && (
+                        {(campaign.status === "draft" || campaign.status === "scheduled") && (
                           <DropdownMenuItem
-                            onClick={() => handleStatusChange(campaign.id, "scheduled")}
+                            onClick={() => handleStartSend(campaign.id)}
+                            disabled={sendingId === campaign.id}
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            送信開始
+                            {sendingId === campaign.id ? "送信開始中..." : "送信開始"}
                           </DropdownMenuItem>
                         )}
                         {campaign.status === "sending" && (
