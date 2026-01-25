@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 
@@ -13,23 +13,43 @@ export default async function CampaignDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  if (!user) {
+    redirect("/auth/login");
+  }
 
-  const { data: campaign } = await supabase
+  // まずキャンペーンのみを取得
+  const { data: campaign, error: campaignError } = await supabase
     .from("campaigns")
-    .select(
-      `
-      *,
-      templates(name, subject, body_text)
-    `
-    )
+    .select("*")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
 
+  if (campaignError) {
+    console.error("Campaign fetch error:", campaignError);
+    notFound();
+  }
+
   if (!campaign) {
     notFound();
   }
+
+  // テンプレート情報を別途取得（オプショナル）
+  let template = null;
+  if (campaign.template_id) {
+    const { data: templateData } = await supabase
+      .from("templates")
+      .select("name, subject, body_text")
+      .eq("id", campaign.template_id)
+      .single();
+    template = templateData;
+  }
+
+  // キャンペーンにテンプレート情報を追加
+  const campaignWithTemplate = {
+    ...campaign,
+    templates: template
+  };
 
   const [messagesResult, statsResult] = await Promise.all([
     supabase
@@ -56,7 +76,7 @@ export default async function CampaignDetailPage({
 
   return (
     <CampaignDetail
-      campaign={campaign}
+      campaign={campaignWithTemplate}
       messages={messagesResult.data ?? []}
       stats={stats}
     />

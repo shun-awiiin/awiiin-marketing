@@ -357,7 +357,8 @@ export function CampaignWizard({
     }
 
     if (campaign) {
-      router.push(`/dashboard/campaigns/${campaign.id}`);
+      // キャンペーン一覧ページにリダイレクト（詳細ページの404問題を回避）
+      router.push(`/dashboard/campaigns`);
     }
     setLoading(false);
   };
