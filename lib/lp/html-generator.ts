@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 // Gemini 3 API設定
 const MODEL_TEXT = 'gemini-3-flash-preview' // Gemini 3 Flash
 const MODEL_PRO = 'gemini-2.5-pro-preview-05-06' // 深い思考用
-const MODEL_IMAGE = 'imagen-3.0-generate-002' // Imagen 3（Nano Banana）
+const MODEL_IMAGE = 'gemini-2.5-flash-preview-image' // Nano Banana（画像生成）
 
 // 画像プレースホルダーのパターン
 const IMAGE_PLACEHOLDERS = [
@@ -1228,66 +1228,156 @@ export interface ImageGenerationPrompt {
   style?: string
 }
 
-// セクションタイプに基づいて画像プロンプトを生成
+// セクションタイプに基づいて画像プロンプトを生成（Nano Banana最適化）
 export function generateImagePrompts(
   input: LPGenerationInput,
   moodTemplate?: { name: string; colorHint: string; toneHint: string } | null
 ): ImageGenerationPrompt[] {
   const style = moodTemplate?.name || 'モダン'
-  const colorHint = moodTemplate?.colorHint || ''
+  const colorHint = moodTemplate?.colorHint || 'blue and white color scheme'
+  const toneHint = moodTemplate?.toneHint || 'professional'
   
+  // Nano Banana用の最適化されたプロンプト形式
+  const createPrompt = (subject: string, additionalStyle: string = '') => `
+[Style]: ${style}, professional photography, high-end marketing visual
+[Subject]: ${subject}
+[Composition]: rule of thirds, balanced, clean background
+[Lighting]: soft studio lighting, subtle shadows
+[Color]: ${colorHint}
+[Mood]: ${toneHint}, ${additionalStyle}
+[Technical]: high resolution, 16:9 aspect ratio, no text, no watermark, 8K quality, photorealistic
+`.trim()
+
   return [
     {
       placeholder: 'IMAGE_PLACEHOLDER_HERO',
-      prompt: `Professional marketing hero image for ${input.product_name}. Target audience: ${input.target_audience}. Style: ${style}, ${colorHint}. High quality, clean composition, inspirational.`,
+      prompt: createPrompt(
+        `Hero image for ${input.product_name} targeting ${input.target_audience}. Shows success, achievement, and transformation. Clean modern aesthetic.`,
+        'inspirational, aspirational'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_PROBLEM',
-      prompt: `Illustration showing frustration or challenge related to: ${input.main_problem}. Style: ${style}, empathetic, relatable. Soft colors, professional.`,
+      prompt: createPrompt(
+        `Person looking frustrated or overwhelmed, representing the challenge: ${input.main_problem}. Empathetic but not negative.`,
+        'relatable, empathetic'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_EMPATHY',
-      prompt: `Warm, understanding illustration of a person experiencing: ${input.main_problem}. Style: ${style}, compassionate, supportive mood.`,
+      prompt: createPrompt(
+        `Supportive visual showing understanding and compassion. Person in contemplative state thinking about their challenges.`,
+        'warm, understanding, supportive'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_SOLUTION',
-      prompt: `Positive illustration showing the solution: ${input.solution}. Style: ${style}, optimistic, professional. Shows transformation and success.`,
+      prompt: createPrompt(
+        `Positive transformation visual showing ${input.solution}. Person achieving success, happy outcome, breakthrough moment.`,
+        'optimistic, triumphant, hopeful'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_FEATURE_1',
-      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      prompt: createPrompt(
+        `Abstract 3D icon representing innovation and simplicity. Geometric shapes, modern design element.`,
+        'clean, minimalist, tech-forward'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_FEATURE_2',
-      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      prompt: createPrompt(
+        `Abstract 3D icon representing reliability and trust. Solid shapes, dependable visual metaphor.`,
+        'trustworthy, stable, professional'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_FEATURE_3',
-      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      prompt: createPrompt(
+        `Abstract 3D icon representing growth and success. Upward movement, progress visual.`,
+        'dynamic, growth-oriented, ambitious'
+      ),
       style,
     },
     {
       placeholder: 'IMAGE_PLACEHOLDER_CTA',
-      prompt: `Call-to-action supporting image for ${input.product_name}. Style: ${style}, energetic, motivating. ${colorHint}`,
+      prompt: createPrompt(
+        `Motivating visual for call-to-action. Shows opportunity, open door, bright future ahead. ${input.product_name} theme.`,
+        'energetic, action-oriented, compelling'
+      ),
       style,
     },
   ]
 }
 
-// Imagen 3で画像を生成（Vertex AI経由）
-export async function generateImage(prompt: string): Promise<string | null> {
-  // 現時点ではプレースホルダー画像を返す
-  // TODO: Vertex AI Imagen 3 APIを実装
-  const encodedPrompt = encodeURIComponent(prompt.slice(0, 100))
-  
-  // 高品質なプレースホルダー画像を返す
-  // 実際の実装ではImagen 3 APIを使用
+// Nano Banana（Gemini 2.5 Flash Image）で画像を生成
+export async function generateImage(
+  prompt: string,
+  aspectRatio: string = '16:9'
+): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    console.log('API key not found, using placeholder image')
+    return getFallbackImage(prompt)
+  }
+
+  try {
+    // Gemini API REST エンドポイント
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_IMAGE}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 1.0,
+          },
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      console.error('Nano Banana API error:', response.status, await response.text())
+      return getFallbackImage(prompt)
+    }
+
+    const data = await response.json()
+
+    // レスポンスから画像データを抽出
+    if (data.candidates?.[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          // Base64画像をデータURLとして返す
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+        }
+      }
+    }
+
+    console.log('No image in response, using fallback')
+    return getFallbackImage(prompt)
+  } catch (error) {
+    console.error('Image generation error:', error)
+    return getFallbackImage(prompt)
+  }
+}
+
+// フォールバック画像（Unsplash）
+function getFallbackImage(prompt: string): string {
   const placeholderImages: Record<string, string> = {
     hero: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&h=600&fit=crop',
     problem: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&h=400&fit=crop',
@@ -1297,15 +1387,15 @@ export async function generateImage(prompt: string): Promise<string | null> {
     cta: 'https://images.unsplash.com/photo-1553484771-371a605b060b?w=600&h=400&fit=crop',
   }
 
-  // プロンプトからタイプを推測
-  if (prompt.toLowerCase().includes('hero')) return placeholderImages.hero
-  if (prompt.toLowerCase().includes('problem') || prompt.toLowerCase().includes('frustration')) return placeholderImages.problem
-  if (prompt.toLowerCase().includes('empathy') || prompt.toLowerCase().includes('understanding')) return placeholderImages.empathy
-  if (prompt.toLowerCase().includes('solution') || prompt.toLowerCase().includes('transformation')) return placeholderImages.solution
-  if (prompt.toLowerCase().includes('feature') || prompt.toLowerCase().includes('icon')) return placeholderImages.feature
-  if (prompt.toLowerCase().includes('cta') || prompt.toLowerCase().includes('call-to-action')) return placeholderImages.cta
+  const promptLower = prompt.toLowerCase()
+  if (promptLower.includes('hero')) return placeholderImages.hero
+  if (promptLower.includes('problem') || promptLower.includes('frustration')) return placeholderImages.problem
+  if (promptLower.includes('empathy') || promptLower.includes('understanding')) return placeholderImages.empathy
+  if (promptLower.includes('solution') || promptLower.includes('transformation')) return placeholderImages.solution
+  if (promptLower.includes('feature') || promptLower.includes('icon')) return placeholderImages.feature
+  if (promptLower.includes('cta') || promptLower.includes('call-to-action')) return placeholderImages.cta
 
-  // デフォルト
+  const encodedPrompt = encodeURIComponent(prompt.slice(0, 100))
   return `https://picsum.photos/seed/${encodedPrompt}/800/600`
 }
 
