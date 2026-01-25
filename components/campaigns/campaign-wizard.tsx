@@ -349,7 +349,14 @@ export function CampaignWizard({
       .select()
       .single();
 
-    if (!error && campaign) {
+    if (error) {
+      console.error("Campaign creation error:", error);
+      alert(`キャンペーン作成エラー: ${error.message}`);
+      setLoading(false);
+      return;
+    }
+
+    if (campaign) {
       router.push(`/dashboard/campaigns/${campaign.id}`);
     }
     setLoading(false);
