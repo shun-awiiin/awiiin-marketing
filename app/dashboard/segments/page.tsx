@@ -7,29 +7,30 @@ export default async function SegmentsPage() {
 
   if (!user) return null
 
-  const { data: segments } = await supabase
-    .from('segments')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .order('name')
-
-  const { data: customFields } = await supabase
-    .from('custom_fields')
-    .select('id, name, field_key')
-    .eq('user_id', user.id)
-    .order('name')
+  // 全てのクエリを並列実行
+  const [segmentsResult, tagsResult, customFieldsResult] = await Promise.all([
+    supabase
+      .from('segments')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('tags')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .order('name'),
+    supabase
+      .from('custom_fields')
+      .select('id, name, field_key')
+      .eq('user_id', user.id)
+      .order('name'),
+  ])
 
   return (
     <SegmentsClient
-      segments={segments || []}
-      tags={tags || []}
-      customFields={customFields || []}
+      segments={segmentsResult.data || []}
+      tags={tagsResult.data || []}
+      customFields={customFieldsResult.data || []}
     />
   )
 }

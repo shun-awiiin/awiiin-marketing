@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Pencil, RotateCcw, GripVertical, ChevronUp, ChevronDown, Trash2, 
-  Plus, Code, Wand2, Save, X, Eye, EyeOff 
+  Plus, Code, Wand2, Save, X, Eye, EyeOff, ImagePlus, Type, Loader2
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface LPSection {
   id: string;
@@ -154,7 +155,7 @@ function SectionBasedPreview({
 
   const [sections, setSections] = useState<LPSection[]>(content.sections || []);
   const [editingSection, setEditingSection] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<"ai" | "html">("ai");
+  const [editMode, setEditMode] = useState<"ai" | "html" | "visual">("ai");
   const [editInstruction, setEditInstruction] = useState("");
   const [editHtml, setEditHtml] = useState("");
   const [showAddSection, setShowAddSection] = useState<number | null>(null);
@@ -371,73 +372,22 @@ function SectionBasedPreview({
 
                 {/* 編集エリア */}
                 {editingSection === section.id && (
-                  <div className="p-3 space-y-3 bg-muted/10">
-                    <Tabs value={editMode} onValueChange={(v) => setEditMode(v as "ai" | "html")}>
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="ai" className="text-xs">
-                          <Wand2 className="size-3 mr-1" />
-                          AI編集
-                        </TabsTrigger>
-                        <TabsTrigger value="html" className="text-xs">
-                          <Code className="size-3 mr-1" />
-                          HTML編集
-                        </TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="ai" className="space-y-2 mt-3">
-                        <textarea
-                          className="w-full p-2 border rounded text-sm font-sans"
-                          rows={3}
-                          placeholder="編集指示を入力&#10;例：見出しをもっとインパクトのあるものに変更&#10;例：背景色を青に変更&#10;例：ボタンのテキストを「今すぐ申し込む」に"
-                          value={editInstruction}
-                          onChange={(e) => setEditInstruction(e.target.value)}
-                        />
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleEditSubmit(section)}
-                            disabled={!editInstruction.trim()}
-                          >
-                            <Wand2 className="size-3 mr-1" />
-                            AIで編集
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleStartEdit(section)}
-                          >
-                            キャンセル
-                          </Button>
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent value="html" className="space-y-2 mt-3">
-                        <textarea
-                          className="w-full p-2 border rounded text-xs font-mono bg-slate-900 text-slate-100"
-                          rows={12}
-                          value={editHtml}
-                          onChange={(e) => setEditHtml(e.target.value)}
-                          spellCheck={false}
-                        />
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleHTMLSave(section)}
-                          >
-                            <Save className="size-3 mr-1" />
-                            保存
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleStartEdit(section)}
-                          >
-                            キャンセル
-                          </Button>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
+                  <SectionEditor
+                    section={section}
+                    editMode={editMode}
+                    setEditMode={setEditMode}
+                    editInstruction={editInstruction}
+                    setEditInstruction={setEditInstruction}
+                    editHtml={editHtml}
+                    setEditHtml={setEditHtml}
+                    onAIEdit={() => handleEditSubmit(section)}
+                    onHTMLSave={() => handleHTMLSave(section)}
+                    onCancel={() => handleStartEdit(section)}
+                    onHTMLUpdate={(html) => {
+                      setEditHtml(html);
+                    }}
+                    globalCss={content.globalCss || ""}
+                  />
                 )}
               </div>
             </div>
@@ -488,6 +438,309 @@ function AddSectionMenu({
     </div>
   );
 }
+
+// セクション編集コンポーネント（AI編集、HTML編集、ビジュアル編集）
+function SectionEditor({
+  section,
+  editMode,
+  setEditMode,
+  editInstruction,
+  setEditInstruction,
+  editHtml,
+  setEditHtml,
+  onAIEdit,
+  onHTMLSave,
+  onCancel,
+  onHTMLUpdate,
+  globalCss,
+}: {
+  section: LPSection;
+  editMode: "ai" | "html" | "visual";
+  setEditMode: (mode: "ai" | "html" | "visual") => void;
+  editInstruction: string;
+  setEditInstruction: (value: string) => void;
+  editHtml: string;
+  setEditHtml: (value: string) => void;
+  onAIEdit: () => void;
+  onHTMLSave: () => void;
+  onCancel: () => void;
+  onHTMLUpdate: (html: string) => void;
+  globalCss: string;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const visualIframeRef = useRef<HTMLIFrameElement>(null);
+
+  // 画像アップロード
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("画像サイズは5MB以下にしてください");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const supabase = createClient();
+      const fileName = `lp-images/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      
+      const { data, error } = await supabase.storage
+        .from("public")
+        .upload(fileName, file, { upsert: true });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from("public")
+        .getPublicUrl(data.path);
+
+      setUploadedImageUrl(urlData.publicUrl);
+      
+      // HTMLに画像タグを挿入
+      const imgTag = `<img src="${urlData.publicUrl}" alt="画像" style="max-width: 100%; height: auto;" />`;
+      setEditHtml(editHtml + "\n" + imgTag);
+      
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("画像のアップロードに失敗しました");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // ビジュアル編集用のiframeからHTMLを取得
+  const getVisualEditedHtml = () => {
+    if (visualIframeRef.current) {
+      const doc = visualIframeRef.current.contentDocument;
+      if (doc && doc.body) {
+        // body内のセクションを取得
+        const sectionEl = doc.body.querySelector("section");
+        if (sectionEl) {
+          return sectionEl.outerHTML;
+        }
+        return doc.body.innerHTML;
+      }
+    }
+    return editHtml;
+  };
+
+  // ビジュアル編集を保存
+  const handleVisualSave = () => {
+    const newHtml = getVisualEditedHtml();
+    onHTMLUpdate(newHtml);
+    onHTMLSave();
+  };
+
+  return (
+    <div className="p-3 space-y-3 bg-muted/10">
+      <Tabs value={editMode} onValueChange={(v) => setEditMode(v as "ai" | "html" | "visual")}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="ai" className="text-xs">
+            <Wand2 className="size-3 mr-1" />
+            AI編集
+          </TabsTrigger>
+          <TabsTrigger value="visual" className="text-xs">
+            <Type className="size-3 mr-1" />
+            直接編集
+          </TabsTrigger>
+          <TabsTrigger value="html" className="text-xs">
+            <Code className="size-3 mr-1" />
+            HTML
+          </TabsTrigger>
+        </TabsList>
+
+        {/* AI編集 */}
+        <TabsContent value="ai" className="space-y-2 mt-3">
+          <textarea
+            className="w-full p-2 border rounded text-sm font-sans"
+            rows={3}
+            placeholder="編集指示を入力&#10;例：見出しをもっとインパクトのあるものに変更&#10;例：背景色を青に変更&#10;例：ボタンのテキストを「今すぐ申し込む」に"
+            value={editInstruction}
+            onChange={(e) => setEditInstruction(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              onClick={onAIEdit}
+              disabled={!editInstruction.trim()}
+            >
+              <Wand2 className="size-3 mr-1" />
+              AIで編集
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onCancel}
+            >
+              キャンセル
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* ビジュアル編集（直接編集） */}
+        <TabsContent value="visual" className="space-y-3 mt-3">
+          <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded">
+            下のプレビュー内のテキストを直接クリックして編集できます
+          </div>
+          <div className="border rounded overflow-hidden bg-white">
+            <VisualEditor
+              ref={visualIframeRef}
+              html={editHtml}
+              css={globalCss}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              onClick={handleVisualSave}
+            >
+              <Save className="size-3 mr-1" />
+              保存
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onCancel}
+            >
+              キャンセル
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* HTML編集 */}
+        <TabsContent value="html" className="space-y-3 mt-3">
+          {/* 画像アップロード */}
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <Loader2 className="size-3 mr-1 animate-spin" />
+              ) : (
+                <ImagePlus className="size-3 mr-1" />
+              )}
+              画像を追加
+            </Button>
+            {uploadedImageUrl && (
+              <span className="text-xs text-green-600">画像をHTMLに挿入しました</span>
+            )}
+          </div>
+
+          {/* HTMLエディター */}
+          <textarea
+            className="w-full p-2 border rounded text-xs font-mono bg-slate-900 text-slate-100"
+            rows={15}
+            value={editHtml}
+            onChange={(e) => setEditHtml(e.target.value)}
+            spellCheck={false}
+          />
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              onClick={onHTMLSave}
+            >
+              <Save className="size-3 mr-1" />
+              保存
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onCancel}
+            >
+              キャンセル
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ビジュアル編集用iframe（contentEditable）
+const VisualEditor = forwardRef<
+  HTMLIFrameElement,
+  { html: string; css: string }
+>(function VisualEditor({ html, css }, ref) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // refを結合
+  useImperativeHandle(ref, () => iframeRef.current as HTMLIFrameElement);
+
+  useEffect(() => {
+    if (iframeRef.current) {
+      const doc = iframeRef.current.contentDocument;
+      if (doc) {
+        const fullHtml = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    ${css}
+    /* 編集可能要素のハイライト */
+    [contenteditable="true"]:hover {
+      outline: 2px dashed #3b82f6;
+      outline-offset: 2px;
+    }
+    [contenteditable="true"]:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;">
+  ${html}
+  <script>
+    // テキスト要素を編集可能にする
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, li, a, button').forEach(el => {
+      el.contentEditable = 'true';
+    });
+  </script>
+</body>
+</html>
+`;
+        doc.open();
+        doc.write(fullHtml);
+        doc.close();
+
+        // 高さ調整
+        const adjustHeight = () => {
+          if (iframeRef.current && doc.body) {
+            const height = doc.body.scrollHeight;
+            iframeRef.current.style.height = `${Math.max(height, 300)}px`;
+          }
+        };
+        setTimeout(adjustHeight, 100);
+      }
+    }
+  }, [html, css]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="w-full min-h-[300px] border-0"
+      title="Visual Editor"
+      sandbox="allow-same-origin allow-scripts"
+    />
+  );
+});
 
 // 旧形式HTML用プレビュー
 function LegacyHTMLPreview({ html, css }: { html: string; css: string }) {
