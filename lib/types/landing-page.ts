@@ -22,8 +22,16 @@ export const BlockType = {
   FORM: 'form',
   VIDEO: 'video',
   COUNTDOWN: 'countdown',
+  HTML: 'html', // 直接HTML/CSSを含むブロック
 } as const
 export type BlockType = (typeof BlockType)[keyof typeof BlockType]
+
+// HTML Block Content（Gemini直接生成用）
+export interface HTMLContent {
+  html: string
+  css: string
+  meta_description?: string
+}
 
 // Block Content Types
 export interface HeroContent {

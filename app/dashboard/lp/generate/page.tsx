@@ -168,10 +168,8 @@ export default function GenerateLPPage() {
       // 参考画像がある場合は画像分析から開始
       if (referenceImage && referenceImageFile) {
         setPhase("analyzing");
-        // Base64データを抽出（data:image/...;base64, の部分を除去）
         const base64Data = referenceImage.split(",")[1];
         payload.referenceImage = base64Data;
-        // リサイズ後はJPEG形式
         payload.referenceImageMimeType = "image/jpeg";
 
         setTimeout(() => setPhase("researching"), 2000);
@@ -183,7 +181,8 @@ export default function GenerateLPPage() {
         setTimeout(() => setPhase("building"), 6000);
       }
 
-      const response = await fetch("/api/landing-pages/generate", {
+      // 新しいHTML生成APIを使用
+      const response = await fetch("/api/landing-pages/generate-html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -195,23 +194,23 @@ export default function GenerateLPPage() {
       }
 
       const data = await response.json();
-
-      // ブロックのIDをUUID形式で再生成
-      const blocksWithValidIds = (data.data.blocks || []).map((block: Record<string, unknown>) => ({
-        ...block,
-        id: crypto.randomUUID(),
-      }));
+      const { html, css, title, meta_description } = data.data;
 
       setPhase("complete");
 
-      // LPを保存
+      // HTMLベースでLPを保存（blocksにhtml/cssを格納）
       const saveResponse = await fetch("/api/landing-pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: formData.product_name,
+          title: formData.product_name || title,
           slug: "lp-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 8),
-          blocks: blocksWithValidIds,
+          blocks: [{
+            id: crypto.randomUUID(),
+            type: "html",
+            content: { html, css, meta_description },
+            settings: { padding: "none", width: "full" },
+          }],
         }),
       });
 

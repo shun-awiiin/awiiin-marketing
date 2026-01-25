@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface LPBlock {
@@ -41,11 +42,96 @@ export function LPPreview({ blocks }: LPPreviewProps) {
     );
   }
 
+  // HTMLブロックがある場合はHTMLプレビューを表示
+  const htmlBlock = typedBlocks.find((b) => b.type === "html");
+  if (htmlBlock) {
+    return <HTMLPreview block={htmlBlock} />;
+  }
+
   return (
     <div className="bg-white">
       {typedBlocks.map((block) => (
         <BlockRenderer key={block.id} block={block} />
       ))}
+    </div>
+  );
+}
+
+// HTMLブロック用のプレビューコンポーネント（iframe使用）
+function HTMLPreview({ block }: { block: LPBlock }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const content = block.content as { html?: string; css?: string };
+
+  useEffect(() => {
+    if (iframeRef.current && content.html) {
+      const doc = iframeRef.current.contentDocument;
+      if (doc) {
+        // HTMLにCSSを埋め込む
+        let fullHtml = content.html;
+        
+        // CSSがある場合は<head>に挿入
+        if (content.css) {
+          const styleTag = `<style>${content.css}</style>`;
+          if (fullHtml.includes("</head>")) {
+            fullHtml = fullHtml.replace("</head>", `${styleTag}</head>`);
+          } else if (fullHtml.includes("<body")) {
+            fullHtml = fullHtml.replace("<body", `<head>${styleTag}</head><body`);
+          } else {
+            fullHtml = `<style>${content.css}</style>${fullHtml}`;
+          }
+        }
+
+        doc.open();
+        doc.write(fullHtml);
+        doc.close();
+
+        // iframe高さを自動調整
+        const adjustHeight = () => {
+          if (iframeRef.current && doc.body) {
+            const height = doc.body.scrollHeight;
+            iframeRef.current.style.height = `${Math.max(height, 600)}px`;
+          }
+        };
+
+        // 画像読み込み完了後に再調整
+        const images = doc.images;
+        let loadedImages = 0;
+        if (images.length === 0) {
+          adjustHeight();
+        } else {
+          for (let i = 0; i < images.length; i++) {
+            images[i].onload = () => {
+              loadedImages++;
+              if (loadedImages === images.length) {
+                adjustHeight();
+              }
+            };
+          }
+        }
+
+        // 少し遅延させてから高さ調整
+        setTimeout(adjustHeight, 100);
+        setTimeout(adjustHeight, 500);
+      }
+    }
+  }, [content.html, content.css]);
+
+  if (!content.html) {
+    return (
+      <div className="flex items-center justify-center h-96 text-muted-foreground">
+        HTMLコンテンツがありません
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full bg-white rounded-lg overflow-hidden border">
+      <iframe
+        ref={iframeRef}
+        className="w-full min-h-[600px] border-0"
+        title="LP Preview"
+        sandbox="allow-same-origin"
+      />
     </div>
   );
 }
