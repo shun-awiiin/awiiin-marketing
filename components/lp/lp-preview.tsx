@@ -488,13 +488,13 @@ function SectionEditor({
       const fileName = `lp-images/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       
       const { data, error } = await supabase.storage
-        .from("public")
+        .from("lp-assets")
         .upload(fileName, file, { upsert: true });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
-        .from("public")
+        .from("lp-assets")
         .getPublicUrl(data.path);
 
       setUploadedImageUrl(urlData.publicUrl);
