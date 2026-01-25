@@ -37,6 +37,7 @@ import {
 import { TestSendDialog } from "./test-send-dialog";
 import { RealtimeStats } from "./realtime-stats";
 import { YouTubePostCard } from "./youtube-post-card";
+import { WhatsAppDMCard } from "./whatsapp-dm-card";
 import type {
   TemplateType,
   SeminarInvitePayload,
@@ -221,6 +222,7 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
           <TabsTrigger value="messages">送信履歴</TabsTrigger>
           <TabsTrigger value="content">メール内容</TabsTrigger>
           <TabsTrigger value="youtube">YouTube投稿</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp DM</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages" className="mt-4">
@@ -303,6 +305,14 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
 
         <TabsContent value="youtube" className="mt-4">
           <YouTubePostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-4">
+          <WhatsAppDMCard
             campaignId={campaign.id}
             campaignType={campaign.type}
             inputPayload={campaign.input_payload}
