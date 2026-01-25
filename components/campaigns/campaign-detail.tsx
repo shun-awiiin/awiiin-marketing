@@ -38,6 +38,8 @@ import { TestSendDialog } from "./test-send-dialog";
 import { RealtimeStats } from "./realtime-stats";
 import { YouTubePostCard } from "./youtube-post-card";
 import { WhatsAppDMCard } from "./whatsapp-dm-card";
+import { XPostCard } from "./x-post-card";
+import { InstagramPostCard } from "./instagram-post-card";
 import type {
   TemplateType,
   SeminarInvitePayload,
@@ -218,11 +220,13 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
       />
 
       <Tabs defaultValue="messages">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="messages">送信履歴</TabsTrigger>
           <TabsTrigger value="content">メール内容</TabsTrigger>
-          <TabsTrigger value="youtube">YouTube投稿</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp DM</TabsTrigger>
+          <TabsTrigger value="x">X</TabsTrigger>
+          <TabsTrigger value="instagram">Instagram</TabsTrigger>
+          <TabsTrigger value="youtube">YouTube</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages" className="mt-4">
@@ -301,6 +305,22 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="x" className="mt-4">
+          <XPostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
+        </TabsContent>
+
+        <TabsContent value="instagram" className="mt-4">
+          <InstagramPostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
         </TabsContent>
 
         <TabsContent value="youtube" className="mt-4">
