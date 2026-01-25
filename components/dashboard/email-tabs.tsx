@@ -78,9 +78,28 @@ const emailPaths = [
 ];
 
 function isEmailPath(pathname: string): boolean {
-  // 他のチャネルのパスを除外
-  const otherChannels = ["/dashboard/line", "/dashboard/youtube", "/dashboard/x", "/dashboard/instagram", "/dashboard/whatsapp", "/dashboard/settings", "/dashboard/social"];
-  if (otherChannels.some((p) => pathname.startsWith(p))) {
+  // 他のチャネルとファネル系パスを除外
+  const excludedPaths = [
+    // チャネル
+    "/dashboard/line",
+    "/dashboard/youtube",
+    "/dashboard/x",
+    "/dashboard/instagram",
+    "/dashboard/whatsapp",
+    "/dashboard/social",
+    // ファネル
+    "/dashboard/lp",
+    "/dashboard/payment",
+    "/dashboard/thank-you",
+    "/dashboard/delivery",
+    "/dashboard/referral",
+    "/dashboard/results",
+    // コンテンツ
+    "/dashboard/courses",
+    // 設定
+    "/dashboard/settings",
+  ];
+  if (excludedPaths.some((p) => pathname.startsWith(p))) {
     return false;
   }
   // メール関連のパスかチェック
