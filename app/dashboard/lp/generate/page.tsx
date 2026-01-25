@@ -82,6 +82,12 @@ export default function GenerateLPPage() {
 
       const data = await response.json();
 
+      // ブロックのIDをUUID形式で再生成
+      const blocksWithValidIds = (data.data.blocks || []).map((block: Record<string, unknown>) => ({
+        ...block,
+        id: crypto.randomUUID(),
+      }));
+
       // LPを保存
       const saveResponse = await fetch("/api/landing-pages", {
         method: "POST",
@@ -92,7 +98,7 @@ export default function GenerateLPPage() {
             .toLowerCase()
             .replace(/[^a-z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, "-")
             .replace(/^-|-$/g, "") + "-" + Date.now().toString(36),
-          blocks: data.data.blocks,
+          blocks: blocksWithValidIds,
         }),
       });
 
