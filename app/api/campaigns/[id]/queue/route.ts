@@ -6,9 +6,13 @@ import {
   generateEmailBody,
   generateUnsubscribeToken
 } from '@/lib/email/template-renderer';
+import { queueCampaignMessages } from '@/lib/sqs/sqs-client';
 import type { TemplateType, SeminarInvitePayload, FreeTrialInvitePayload } from '@/lib/types/database';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+// SQSが設定されているかチェック
+const USE_SQS = !!process.env.SQS_EMAIL_QUEUE_URL;
 
 // POST /api/campaigns/:id/queue - Queue campaign for sending
 export async function POST(
@@ -177,13 +181,16 @@ export async function POST(
         .upsert(unsub, { onConflict: 'email', ignoreDuplicates: true });
     }
 
-    // Batch insert messages
+    // Batch insert messages and collect IDs
     const batchSize = 500;
+    const insertedMessageIds: string[] = [];
+
     for (let i = 0; i < messages.length; i += batchSize) {
       const batch = messages.slice(i, i + batchSize);
-      const { error: insertError } = await supabase
+      const { data: insertedData, error: insertError } = await supabase
         .from('messages')
-        .insert(batch);
+        .insert(batch)
+        .select('id');
 
       if (insertError) {
         console.error('Message insert error:', insertError);
@@ -191,6 +198,10 @@ export async function POST(
           error: `Failed to create messages: ${insertError.message}`,
           details: insertError
         }, { status: 500 });
+      }
+
+      if (insertedData) {
+        insertedMessageIds.push(...insertedData.map(m => m.id));
       }
     }
 
@@ -226,15 +237,28 @@ export async function POST(
       }
     });
 
-    // Trigger the send process (in background)
-    // In production, this would be a background job/queue
-    triggerSendProcess(id);
+    // Queue messages to SQS or fallback to direct API call
+    if (USE_SQS && insertedMessageIds.length > 0) {
+      // SQS経由で送信（本番用）
+      const sqsResult = await queueCampaignMessages(id, insertedMessageIds);
+      console.log(`SQS queue result: ${sqsResult.successful} successful, ${sqsResult.failed} failed`);
+
+      // ステータスをsendingに更新
+      await supabase
+        .from('campaigns')
+        .update({ status: 'sending' })
+        .eq('id', id);
+    } else {
+      // SQS未設定の場合は既存のAPI経由（開発/フォールバック用）
+      triggerSendProcess(id);
+    }
 
     return NextResponse.json({
       data: {
         campaign_id: id,
         status: 'queued',
         total_messages: messages.length,
+        queued_to_sqs: USE_SQS,
         estimated_completion: estimatedCompletion
       }
     });
@@ -244,7 +268,7 @@ export async function POST(
   }
 }
 
-// Trigger background send process
+// Trigger background send process (fallback when SQS is not configured)
 async function triggerSendProcess(campaignId: string) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

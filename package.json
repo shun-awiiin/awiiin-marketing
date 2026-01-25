@@ -9,9 +9,14 @@
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "sst:dev": "sst dev",
+    "sst:deploy": "sst deploy --stage production",
+    "sst:remove": "sst remove"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.975.0",
+    "@aws-sdk/client-sqs": "^3.975.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -69,10 +74,12 @@
     "@tailwindcss/postcss": "^4.1.9",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/aws-lambda": "^8.10.160",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
+    "sst": "^3.17.37",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5",
