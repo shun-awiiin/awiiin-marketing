@@ -7,32 +7,72 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Plus, X, Zap, Target, Gift, Users } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+
+interface Testimonial {
+  name: string;
+  quote: string;
+}
 
 export default function GenerateLPPage() {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
-    productName: "",
-    productDescription: "",
-    targetAudience: "",
-    tone: "professional",
-    ctaText: "",
-    benefits: "",
+    product_name: "",
+    target_audience: "",
+    main_problem: "",
+    solution: "",
+    price: "",
+    urgency: "",
   });
+  const [bonuses, setBonuses] = useState<string[]>([""]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  const handleAddBonus = () => {
+    setBonuses([...bonuses, ""]);
+  };
+
+  const handleRemoveBonus = (index: number) => {
+    setBonuses(bonuses.filter((_, i) => i !== index));
+  };
+
+  const handleBonusChange = (index: number, value: string) => {
+    const newBonuses = [...bonuses];
+    newBonuses[index] = value;
+    setBonuses(newBonuses);
+  };
+
+  const handleAddTestimonial = () => {
+    setTestimonials([...testimonials, { name: "", quote: "" }]);
+  };
+
+  const handleRemoveTestimonial = (index: number) => {
+    setTestimonials(testimonials.filter((_, i) => i !== index));
+  };
+
+  const handleTestimonialChange = (index: number, field: keyof Testimonial, value: string) => {
+    const newTestimonials = [...testimonials];
+    newTestimonials[index] = { ...newTestimonials[index], [field]: value };
+    setTestimonials(newTestimonials);
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
 
     try {
+      const payload = {
+        ...formData,
+        bonuses: bonuses.filter((b) => b.trim() !== ""),
+        testimonials: testimonials.filter((t) => t.name.trim() !== "" && t.quote.trim() !== ""),
+      };
+
       const response = await fetch("/api/landing-pages/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -41,8 +81,28 @@ export default function GenerateLPPage() {
       }
 
       const data = await response.json();
+
+      // LPを保存
+      const saveResponse = await fetch("/api/landing-pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formData.product_name,
+          slug: formData.product_name
+            .toLowerCase()
+            .replace(/[^a-z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, "-")
+            .replace(/^-|-$/g, "") + "-" + Date.now().toString(36),
+          blocks: data.data.blocks,
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error("LPの保存に失敗しました");
+      }
+
+      const savedLP = await saveResponse.json();
       toast.success("LPを生成しました");
-      router.push(`/dashboard/lp/${data.data.id}`);
+      router.push(`/dashboard/lp/${savedLP.data.id}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "生成に失敗しました");
     } finally {
@@ -61,141 +121,278 @@ export default function GenerateLPPage() {
         <div>
           <h1 className="text-2xl font-bold">AIでLP生成</h1>
           <p className="text-muted-foreground">
-            商品情報を入力すると、AIが最適なLPを自動生成します
+            Google Geminiが高コンバージョンなLPを自動生成します
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>商品・サービス情報</CardTitle>
-              <CardDescription>
-                AIがLPを生成するための情報を入力してください
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleGenerate} className="space-y-4">
+      <form onSubmit={handleGenerate}>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-6">
+            {/* 基本情報 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="size-5 text-primary" />
+                  基本情報
+                </CardTitle>
+                <CardDescription>
+                  商品・サービスの核となる情報を入力してください
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="productName">商品・サービス名 *</Label>
+                  <Label htmlFor="product_name">商品・サービス名 *</Label>
                   <Input
-                    id="productName"
-                    placeholder="例: プレミアムオンライン講座"
-                    value={formData.productName}
-                    onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                    id="product_name"
+                    placeholder="例: オンライン英会話マスターコース"
+                    value={formData.product_name}
+                    onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
                     required
                     disabled={isGenerating}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="productDescription">商品説明 *</Label>
+                  <Label htmlFor="solution">提供する解決策 *</Label>
                   <Textarea
-                    id="productDescription"
-                    placeholder="商品やサービスの詳細な説明を入力してください..."
-                    value={formData.productDescription}
-                    onChange={(e) => setFormData({ ...formData, productDescription: e.target.value })}
-                    rows={4}
+                    id="solution"
+                    placeholder="例: 1日15分のオンラインレッスンで3ヶ月で日常会話をマスター。ネイティブ講師との実践的な会話練習で、確実に話せるようになります。"
+                    value={formData.solution}
+                    onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
+                    rows={3}
                     required
                     disabled={isGenerating}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    あなたの商品・サービスがどのように顧客の問題を解決するかを具体的に
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="targetAudience">ターゲット顧客 *</Label>
+                  <Label htmlFor="price">価格</Label>
                   <Input
-                    id="targetAudience"
-                    placeholder="例: 30-40代のビジネスパーソン"
-                    value={formData.targetAudience}
-                    onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
+                    id="price"
+                    placeholder="例: 月額9,800円"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    disabled={isGenerating}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ターゲット情報 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="size-5 text-primary" />
+                  ターゲット情報
+                </CardTitle>
+                <CardDescription>
+                  誰に向けたLPかを明確にしましょう
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="target_audience">ターゲット顧客 *</Label>
+                  <Input
+                    id="target_audience"
+                    placeholder="例: 英語を話せるようになりたい30-40代のビジネスパーソン"
+                    value={formData.target_audience}
+                    onChange={(e) => setFormData({ ...formData, target_audience: e.target.value })}
                     required
                     disabled={isGenerating}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="benefits">主な特徴・メリット</Label>
+                  <Label htmlFor="main_problem">主な悩み・課題 *</Label>
                   <Textarea
-                    id="benefits"
-                    placeholder="箇条書きで入力してください（1行に1つ）&#10;例:&#10;・短期間で成果が出る&#10;・専門家によるサポート付き"
-                    value={formData.benefits}
-                    onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
-                    rows={4}
+                    id="main_problem"
+                    placeholder="例: 英会話スクールに通う時間がない、独学では上達しない、実践的な会話の機会がない"
+                    value={formData.main_problem}
+                    onChange={(e) => setFormData({ ...formData, main_problem: e.target.value })}
+                    rows={3}
+                    required
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ターゲットが抱えている具体的な悩みや課題を入力
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 特典・限定性 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="size-5 text-primary" />
+                  特典・限定性
+                </CardTitle>
+                <CardDescription>
+                  コンバージョン率を高める要素を追加しましょう
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>特典・ボーナス</Label>
+                  {bonuses.map((bonus, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        placeholder={`特典${index + 1}: 例) オリジナル単語帳PDF`}
+                        value={bonus}
+                        onChange={(e) => handleBonusChange(index, e.target.value)}
+                        disabled={isGenerating}
+                      />
+                      {bonuses.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveBonus(index)}
+                          disabled={isGenerating}
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddBonus}
+                    disabled={isGenerating}
+                  >
+                    <Plus className="size-4 mr-2" />
+                    特典を追加
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="urgency">限定性（期間・人数）</Label>
+                  <Input
+                    id="urgency"
+                    placeholder="例: 先着30名限定で初月50%オフ"
+                    value={formData.urgency}
+                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
                     disabled={isGenerating}
                   />
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="tone">トーン</Label>
-                    <Select
-                      value={formData.tone}
-                      onValueChange={(value) => setFormData({ ...formData, tone: value })}
-                      disabled={isGenerating}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="professional">プロフェッショナル</SelectItem>
-                        <SelectItem value="casual">カジュアル</SelectItem>
-                        <SelectItem value="urgent">緊急感</SelectItem>
-                        <SelectItem value="friendly">親しみやすい</SelectItem>
-                        <SelectItem value="luxury">高級感</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ctaText">CTAボタンのテキスト</Label>
+            {/* お客様の声 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="size-5 text-primary" />
+                  お客様の声（任意）
+                </CardTitle>
+                <CardDescription>
+                  実際の体験談があれば追加してください
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {testimonials.map((testimonial, index) => (
+                  <div key={index} className="space-y-2 p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <Label>お客様 {index + 1}</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveTestimonial(index)}
+                        disabled={isGenerating}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
                     <Input
-                      id="ctaText"
-                      placeholder="例: 今すぐ申し込む"
-                      value={formData.ctaText}
-                      onChange={(e) => setFormData({ ...formData, ctaText: e.target.value })}
+                      placeholder="お名前（例: 田中さん）"
+                      value={testimonial.name}
+                      onChange={(e) => handleTestimonialChange(index, "name", e.target.value)}
+                      disabled={isGenerating}
+                    />
+                    <Textarea
+                      placeholder="感想（例: 3ヶ月で海外旅行で困らなくなりました）"
+                      value={testimonial.quote}
+                      onChange={(e) => handleTestimonialChange(index, "quote", e.target.value)}
+                      rows={2}
                       disabled={isGenerating}
                     />
                   </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTestimonial}
+                  disabled={isGenerating}
+                >
+                  <Plus className="size-4 mr-2" />
+                  お客様の声を追加
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* 生成ボタン */}
+            <Button type="submit" disabled={isGenerating} className="w-full" size="lg">
+              {isGenerating ? (
+                <>
+                  <Loader2 className="size-5 mr-2 animate-spin" />
+                  AIが生成中...（30秒〜1分程度）
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-5 mr-2" />
+                  AIでLPを生成
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* サイドバー */}
+          <div className="space-y-6">
+            <Card className="sticky top-6">
+              <CardHeader>
+                <CardTitle>生成のヒント</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-medium mb-2">高CVRのLPに必要な要素</h4>
+                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                    <li>明確なターゲット設定</li>
+                    <li>具体的な悩みと解決策</li>
+                    <li>数字で示す実績</li>
+                    <li>限定性・緊急性</li>
+                    <li>社会的証明（お客様の声）</li>
+                  </ul>
                 </div>
 
-                <Button type="submit" disabled={isGenerating} className="w-full">
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="size-4 mr-2 animate-spin" />
-                      生成中...（30秒〜1分程度かかります）
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-4 mr-2" />
-                      AIでLPを生成
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+                <div>
+                  <h4 className="font-medium mb-2">入力のコツ</h4>
+                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                    <li>ターゲットは具体的に（年齢、職業、状況）</li>
+                    <li>悩みは感情も含めて記載</li>
+                    <li>解決策は具体的な方法と期間</li>
+                    <li>特典は価値が伝わるように</li>
+                  </ul>
+                </div>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>生成のヒント</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <p>
-                より良いLPを生成するために、以下のポイントを意識してください：
-              </p>
-              <ul className="list-disc pl-4 space-y-2">
-                <li>商品の具体的な価値や特徴を詳しく記載</li>
-                <li>ターゲット顧客の悩みや課題を明確に</li>
-                <li>競合との差別化ポイントを含める</li>
-                <li>数字やデータがあれば含める</li>
-              </ul>
-            </CardContent>
-          </Card>
+                <div className="p-3 bg-primary/5 rounded-lg">
+                  <h4 className="font-medium mb-1">AI技術</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Google Gemini 2.0を使用し、構造化出力で安定したLP生成を実現しています。
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
