@@ -75,19 +75,39 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser();
 
       if (authUser) {
-        const { error } = await supabase
+        // まず既存のレコードがあるか確認
+        const { data: existingUser } = await supabase
           .from("users")
-          .upsert({
-            id: authUser.id,
-            email: authUser.email,
-            settings
-          }, { onConflict: "id" });
+          .select("id")
+          .eq("id", authUser.id)
+          .single();
+
+        let error;
+        if (existingUser) {
+          // 既存のレコードがあればupdate
+          const result = await supabase
+            .from("users")
+            .update({ settings })
+            .eq("id", authUser.id);
+          error = result.error;
+        } else {
+          // なければinsert
+          const result = await supabase
+            .from("users")
+            .insert({
+              id: authUser.id,
+              email: authUser.email,
+              settings
+            });
+          error = result.error;
+        }
 
         if (error) throw error;
 
         setMessage({ type: "success", text: "設定を保存しました" });
       }
     } catch (error) {
+      console.error("Save error:", error);
       setMessage({ type: "error", text: "設定の保存に失敗しました" });
     }
 
