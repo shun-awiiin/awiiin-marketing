@@ -33,6 +33,7 @@ import {
   Youtube,
   Instagram,
   MessageCircle,
+  Shield,
 } from "lucide-react";
 import { XIcon } from "@/components/icons/x-icon";
 
@@ -156,7 +157,29 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname.startsWith("/dashboard/settings")}
+                  isActive={pathname === "/dashboard/settings/line"}
+                >
+                  <Link href="/dashboard/settings/line">
+                    <MessageSquare className="size-4" />
+                    <span>LINE連携</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/dashboard/settings/dns"}
+                >
+                  <Link href="/dashboard/settings/dns">
+                    <Shield className="size-4" />
+                    <span>DNS設定</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/dashboard/settings"}
                 >
                   <Link href="/dashboard/settings">
                     <Settings className="size-4" />
