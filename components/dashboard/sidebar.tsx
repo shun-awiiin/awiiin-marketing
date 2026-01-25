@@ -34,8 +34,69 @@ import {
   Instagram,
   MessageCircle,
   Shield,
+  FileText,
+  CreditCard,
+  Heart,
+  Send,
+  Users,
+  BarChart3,
+  GraduationCap,
 } from "lucide-react";
 import { XIcon } from "@/components/icons/x-icon";
+
+const funnelMenuItems = [
+  {
+    title: "LP",
+    icon: FileText,
+    href: "/dashboard/lp",
+    matchPaths: ["/dashboard/lp"],
+    description: "ランディングページ",
+  },
+  {
+    title: "決済",
+    icon: CreditCard,
+    href: "/dashboard/payment",
+    matchPaths: ["/dashboard/payment"],
+    description: "商品・決済管理",
+  },
+  {
+    title: "サンクス",
+    icon: Heart,
+    href: "/dashboard/thank-you",
+    matchPaths: ["/dashboard/thank-you"],
+    description: "サンクスページ",
+  },
+  {
+    title: "配信",
+    icon: Send,
+    href: "/dashboard/delivery",
+    matchPaths: ["/dashboard/delivery", "/dashboard/campaigns", "/dashboard/scenarios"],
+    description: "メール・LINE配信",
+  },
+  {
+    title: "紹介",
+    icon: Users,
+    href: "/dashboard/referral",
+    matchPaths: ["/dashboard/referral"],
+    description: "アフィリエイト",
+  },
+  {
+    title: "結果",
+    icon: BarChart3,
+    href: "/dashboard/results",
+    matchPaths: ["/dashboard/results"],
+    description: "コンバージョン分析",
+  },
+];
+
+const contentMenuItems = [
+  {
+    title: "コース",
+    icon: GraduationCap,
+    href: "/dashboard/courses",
+    matchPaths: ["/dashboard/courses"],
+  },
+];
 
 const channelMenuItems = [
   {
@@ -44,8 +105,6 @@ const channelMenuItems = [
     href: "/dashboard",
     matchPaths: [
       "/dashboard",
-      "/dashboard/campaigns",
-      "/dashboard/scenarios",
       "/dashboard/segments",
       "/dashboard/contacts",
       "/dashboard/tags",
@@ -127,6 +186,52 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>ファネル</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {funnelMenuItems.map((item) => {
+                const isActive = item.matchPaths.some(
+                  (path) => pathname === path || pathname.startsWith(path + "/")
+                );
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive}>
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>コンテンツ</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {contentMenuItems.map((item) => {
+                const isActive = item.matchPaths.some(
+                  (path) => pathname === path || pathname.startsWith(path + "/")
+                );
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive}>
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>チャネル</SidebarGroupLabel>
           <SidebarGroupContent>
