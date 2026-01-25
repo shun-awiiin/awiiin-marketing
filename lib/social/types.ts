@@ -372,6 +372,9 @@ export type SocialEventType =
   | 'post_deleted'
   | 'engagement_updated'
   | 'webhook_received'
+  | 'youtube_manual_copy'
+  | 'youtube_manual_studio_opened'
+  | 'youtube_manual_posted'
 
 export interface SocialEvent {
   id: string
