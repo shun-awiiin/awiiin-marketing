@@ -166,7 +166,7 @@ export default function DomainHealthPage() {
                     placeholder="default"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    わからない場合は空欄で自動検出します
+                    Amazon SESの場合はCNAMEレコード名の最初の部分（例: ru4vlsprnqg3icvad3ksnlb35etpco5x）を入力してください。Google/Microsoft等は空欄で自動検出します。
                   </p>
                 </div>
                 <Button

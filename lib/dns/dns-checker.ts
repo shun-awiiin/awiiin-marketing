@@ -198,10 +198,10 @@ async function checkDmarc(domain: string): Promise<DnsCheckResult['dmarc']> {
 /**
  * ドメインのDNS設定を包括的にチェック
  */
-export async function checkDns(domain: string): Promise<DnsCheckResult> {
+export async function checkDns(domain: string, dkimSelector?: string): Promise<DnsCheckResult> {
   const [spf, dkim, dmarc] = await Promise.all([
     checkSpf(domain),
-    checkDkim(domain),
+    dkimSelector ? checkDkim(domain, dkimSelector) : checkDkim(domain),
     checkDmarc(domain),
   ]);
 

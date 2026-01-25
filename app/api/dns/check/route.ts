@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { domain } = await request.json();
+    const { domain, dkim_selector } = await request.json();
 
     if (!domain) {
       return NextResponse.json(
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // DNSチェック実行
-    const result = await checkDns(domain);
+    const result = await checkDns(domain, dkim_selector);
 
     // 結果をDBに保存
     await supabase.from('dns_verification').upsert(
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         domain,
         spf_valid: result.spf.valid,
         dkim_valid: result.dkim.valid,
+        dkim_selector: result.dkim.selector || dkim_selector || null,
         dmarc_valid: result.dmarc.valid,
         dmarc_policy: result.dmarc.policy,
         last_checked_at: new Date().toISOString(),

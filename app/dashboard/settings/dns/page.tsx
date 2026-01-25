@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,19 @@ import {
   Shield,
   RefreshCw,
   Info,
+  Globe,
 } from "lucide-react";
+
+interface SavedDomain {
+  id: string;
+  domain: string;
+  dkim_selector: string | null;
+  spf_valid: boolean;
+  dkim_valid: boolean;
+  dmarc_valid: boolean;
+  dmarc_policy: string | null;
+  last_checked_at: string;
+}
 
 interface DnsCheckResult {
   domain: string;
@@ -32,9 +44,36 @@ interface DnsCheckResult {
 
 export default function DnsSettingsPage() {
   const [domain, setDomain] = useState("");
+  const [dkimSelector, setDkimSelector] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DnsCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedDomains, setSavedDomains] = useState<SavedDomain[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(true);
+
+  // 保存済みドメインを読み込む
+  useEffect(() => {
+    const fetchSavedDomains = async () => {
+      try {
+        const response = await fetch("/api/dns/check");
+        if (response.ok) {
+          const data = await response.json();
+          setSavedDomains(data.domains || []);
+        }
+      } catch {
+        // エラーは無視（初回は空でOK）
+      } finally {
+        setLoadingSaved(false);
+      }
+    };
+    fetchSavedDomains();
+  }, []);
+
+  // 保存済みドメインを選択
+  const handleSelectSaved = (saved: SavedDomain) => {
+    setDomain(saved.domain);
+    setDkimSelector(saved.dkim_selector || "");
+  };
 
   const handleCheck = async () => {
     if (!domain.trim()) return;
@@ -46,7 +85,10 @@ export default function DnsSettingsPage() {
       const response = await fetch("/api/dns/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: domain.trim() }),
+        body: JSON.stringify({ 
+          domain: domain.trim(),
+          dkim_selector: dkimSelector.trim() || undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -55,6 +97,13 @@ export default function DnsSettingsPage() {
 
       const data = await response.json();
       setResult(data);
+      
+      // 保存済みリストを更新
+      const listResponse = await fetch("/api/dns/check");
+      if (listResponse.ok) {
+        const listData = await listResponse.json();
+        setSavedDomains(listData.domains || []);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -78,6 +127,51 @@ export default function DnsSettingsPage() {
         </p>
       </div>
 
+      {/* 保存済みドメイン */}
+      {!loadingSaved && savedDomains.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Globe className="h-5 w-5" />
+              保存済みドメイン
+            </CardTitle>
+            <CardDescription>
+              クリックして再チェック
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {savedDomains.map((saved) => (
+                <button
+                  key={saved.id}
+                  onClick={() => handleSelectSaved(saved)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {saved.spf_valid && saved.dkim_valid && saved.dmarc_valid ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                    )}
+                    <div>
+                      <p className="font-medium">{saved.domain}</p>
+                      {saved.dkim_selector && (
+                        <p className="text-xs text-muted-foreground">
+                          セレクター: {saved.dkim_selector}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(saved.last_checked_at).toLocaleDateString("ja-JP")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -89,26 +183,40 @@ export default function DnsSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label htmlFor="domain">送信元ドメイン</Label>
-              <Input
-                id="domain"
-                placeholder="例: m.awiiin.com"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCheck()}
-              />
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Label htmlFor="domain">送信元ドメイン</Label>
+                <Input
+                  id="domain"
+                  placeholder="例: m.awiiin.com"
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCheck()}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleCheck} disabled={loading || !domain.trim()}>
+                  {loading ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Shield className="mr-2 h-4 w-4" />
+                  )}
+                  検証
+                </Button>
+              </div>
             </div>
-            <div className="flex items-end">
-              <Button onClick={handleCheck} disabled={loading || !domain.trim()}>
-                {loading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Shield className="mr-2 h-4 w-4" />
-                )}
-                検証
-              </Button>
+            <div>
+              <Label htmlFor="dkim-selector">DKIMセレクター（任意）</Label>
+              <Input
+                id="dkim-selector"
+                placeholder="例: ru4vlsprnqg3icvad3ksnlb35etpco5x"
+                value={dkimSelector}
+                onChange={(e) => setDkimSelector(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Amazon SESの場合はCNAMEレコード名の最初の部分を入力してください。空欄の場合は自動検出を試みます。
+              </p>
             </div>
           </div>
         </CardContent>
