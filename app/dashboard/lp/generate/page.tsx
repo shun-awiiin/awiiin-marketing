@@ -94,10 +94,7 @@ export default function GenerateLPPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: formData.product_name,
-          slug: formData.product_name
-            .toLowerCase()
-            .replace(/[^a-z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, "-")
-            .replace(/^-|-$/g, "") + "-" + Date.now().toString(36),
+          slug: "lp-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 8),
           blocks: blocksWithValidIds,
         }),
       });
