@@ -18,6 +18,92 @@ interface Testimonial {
   quote: string;
 }
 
+// 雰囲気テンプレート
+interface MoodTemplate {
+  id: string;
+  name: string;
+  description: string;
+  preview: string; // グラデーション色
+  keywords: string[];
+  colorHint: string;
+  toneHint: string;
+}
+
+const moodTemplates: MoodTemplate[] = [
+  {
+    id: "modern",
+    name: "モダン・ミニマル",
+    description: "洗練されたシンプルさ、余白を活かしたクリーンなデザイン",
+    preview: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    keywords: ["洗練", "シンプル", "クリーン", "現代的"],
+    colorHint: "青紫系のグラデーション、白背景、黒テキスト",
+    toneHint: "スタイリッシュで都会的、無駄のない表現",
+  },
+  {
+    id: "luxury",
+    name: "高級・エレガント",
+    description: "上品で落ち着いた印象、信頼感と品質を伝える",
+    preview: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+    keywords: ["高級", "エレガント", "上品", "信頼"],
+    colorHint: "ダークネイビー、ゴールドアクセント、白テキスト",
+    toneHint: "格調高く、落ち着いた大人の雰囲気",
+  },
+  {
+    id: "warm",
+    name: "温かみ・親しみ",
+    description: "安心感と親近感、人との繋がりを感じさせる",
+    preview: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+    keywords: ["温かみ", "親しみ", "安心", "優しさ"],
+    colorHint: "ピンク〜オレンジ系の暖色、柔らかい印象",
+    toneHint: "フレンドリーで寄り添う、共感を呼ぶ表現",
+  },
+  {
+    id: "energetic",
+    name: "エネルギッシュ・インパクト",
+    description: "力強さと行動力、今すぐ動きたくなる",
+    preview: "linear-gradient(135deg, #ff6b6b 0%, #feca57 100%)",
+    keywords: ["力強い", "インパクト", "行動", "情熱"],
+    colorHint: "赤〜オレンジ、黄色のビビッドな組み合わせ",
+    toneHint: "ダイナミックで熱量のある、勢いを感じる表現",
+  },
+  {
+    id: "professional",
+    name: "プロフェッショナル・信頼",
+    description: "専門性と実績、ビジネス向けの堅実さ",
+    preview: "linear-gradient(135deg, #2c3e50 0%, #3498db 100%)",
+    keywords: ["プロフェッショナル", "信頼", "実績", "専門性"],
+    colorHint: "ネイビー〜ブルー系、グレーアクセント",
+    toneHint: "論理的で説得力のある、データに基づく表現",
+  },
+  {
+    id: "natural",
+    name: "ナチュラル・オーガニック",
+    description: "自然体で健康的、環境や体に優しい印象",
+    preview: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+    keywords: ["自然", "健康", "オーガニック", "クリーン"],
+    colorHint: "グリーン系、アースカラー、白背景",
+    toneHint: "穏やかで健全、自然な流れを感じる表現",
+  },
+  {
+    id: "tech",
+    name: "テック・イノベーション",
+    description: "先進的で革新的、未来を感じさせる",
+    preview: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+    keywords: ["先進的", "革新", "テクノロジー", "未来"],
+    colorHint: "ダークモード、ネオン系アクセント、サイバー感",
+    toneHint: "先端技術を感じさせる、可能性を示す表現",
+  },
+  {
+    id: "playful",
+    name: "ポップ・カジュアル",
+    description: "楽しくて親しみやすい、若々しい印象",
+    preview: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
+    keywords: ["楽しい", "カジュアル", "ポップ", "若々しい"],
+    colorHint: "パステルカラー、カラフルなアクセント",
+    toneHint: "軽やかで楽しげ、ワクワクする表現",
+  },
+];
+
 type GenerationPhase = "idle" | "analyzing" | "deep_analysis" | "design_concept" | "building" | "critique" | "complete";
 
 const phaseLabels: Record<GenerationPhase, { label: string; description: string; progress: number }> = {
@@ -50,6 +136,7 @@ export default function GenerateLPPage() {
   const [advancedMode, setAdvancedMode] = useState(true); // デフォルトで高品質モード
   const [brandKeywords, setBrandKeywords] = useState<string[]>([""]); // ブランドキーワード
   const [keyFeatures, setKeyFeatures] = useState<string[]>([""]); // 主要特徴
+  const [selectedMood, setSelectedMood] = useState<string | null>(null); // 選択した雰囲気テンプレート
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,13 +250,28 @@ export default function GenerateLPPage() {
     setIsGenerating(true);
 
     try {
+      // 選択したテンプレートの情報を取得
+      const selectedTemplate = selectedMood ? moodTemplates.find(t => t.id === selectedMood) : null;
+      
+      // テンプレートのキーワードをブランドキーワードにマージ
+      const mergedKeywords = [
+        ...brandKeywords.filter((k) => k.trim() !== ""),
+        ...(selectedTemplate?.keywords || []),
+      ];
+
       const payload: Record<string, unknown> = {
         ...formData,
         bonuses: bonuses.filter((b) => b.trim() !== ""),
         testimonials: testimonials.filter((t) => t.name.trim() !== "" && t.quote.trim() !== ""),
         advancedMode,
-        brand_keywords: brandKeywords.filter((k) => k.trim() !== ""),
+        brand_keywords: mergedKeywords,
         key_features: keyFeatures.filter((f) => f.trim() !== ""),
+        // テンプレート情報
+        mood_template: selectedTemplate ? {
+          name: selectedTemplate.name,
+          colorHint: selectedTemplate.colorHint,
+          toneHint: selectedTemplate.toneHint,
+        } : null,
       };
 
       // 4段階高品質モードのフェーズ進行
@@ -271,6 +373,63 @@ export default function GenerateLPPage() {
       <form onSubmit={handleGenerate}>
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
+            {/* 雰囲気テンプレート選択 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="size-5 text-primary" />
+                  雰囲気を選ぶ
+                </CardTitle>
+                <CardDescription>
+                  LPの雰囲気・トーンを選択してください。選択しない場合は入力内容から自動判定します。
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {moodTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedMood(selectedMood === template.id ? null : template.id)}
+                      disabled={isGenerating}
+                      className={`relative p-3 rounded-lg border-2 transition-all text-left ${
+                        selectedMood === template.id
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                    >
+                      <div
+                        className="w-full h-8 rounded-md mb-2"
+                        style={{ background: template.preview }}
+                      />
+                      <div className="font-medium text-sm">{template.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                        {template.description}
+                      </div>
+                      {selectedMood === template.id && (
+                        <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {selectedMood && (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                    <div className="text-sm">
+                      <span className="font-medium">選択中: </span>
+                      {moodTemplates.find(t => t.id === selectedMood)?.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {moodTemplates.find(t => t.id === selectedMood)?.toneHint}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* 参考画像アップロード */}
             <Card className="border-dashed">
               <CardHeader>

@@ -36,6 +36,12 @@ const generateSchema = z.object({
   brand_keywords: z.array(z.string()).optional(),
   key_features: z.array(z.string()).optional(),
   desired_action: z.string().optional(),
+  // 雰囲気テンプレート
+  mood_template: z.object({
+    name: z.string(),
+    colorHint: z.string(),
+    toneHint: z.string(),
+  }).optional().nullable(),
 })
 
 // セクション編集スキーマ

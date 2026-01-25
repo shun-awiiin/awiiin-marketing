@@ -16,6 +16,11 @@ export interface LPGenerationInput {
   brand_keywords?: string[]
   key_features?: string[]
   desired_action?: string
+  mood_template?: {
+    name: string
+    colorHint: string
+    toneHint: string
+  } | null
 }
 
 // ========================================
@@ -744,7 +749,22 @@ ${imageAnalysis.special_features ? `- 特徴: ${imageAnalysis.special_features.j
 `
   }
 
+  // 雰囲気テンプレートからの指示
+  let moodInstructions = ''
+  if (input.mood_template) {
+    moodInstructions = `
+## 雰囲気・トーン（最優先で反映）
+- スタイル: ${input.mood_template.name}
+- カラー指針: ${input.mood_template.colorHint}
+- トーン指針: ${input.mood_template.toneHint}
+
+このテンプレートの雰囲気を最優先で反映し、一貫性のあるデザインにしてください。
+`
+  }
+
   const prompt = `${FULL_LP_PROMPT}
+
+${moodInstructions}
 
 ${designInstructions}
 
@@ -822,7 +842,22 @@ ${imageAnalysis.special_features ? `- 特徴: ${imageAnalysis.special_features.j
 `
   }
 
+  // 雰囲気テンプレートからの指示
+  let moodInstructions = ''
+  if (input.mood_template) {
+    moodInstructions = `
+## 雰囲気・トーン（最優先で反映）
+- スタイル: ${input.mood_template.name}
+- カラー指針: ${input.mood_template.colorHint}
+- トーン指針: ${input.mood_template.toneHint}
+
+このテンプレートの雰囲気を最優先で反映し、一貫性のあるデザインにしてください。
+`
+  }
+
   const prompt = `${FULL_LP_PROMPT}
+
+${moodInstructions}
 
 ${designInstructions}
 
