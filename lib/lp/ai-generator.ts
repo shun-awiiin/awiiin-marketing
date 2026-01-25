@@ -2,8 +2,9 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import type { LPBlock, BlockType } from '@/lib/types/landing-page'
 
 // Gemini API設定
-const MODEL_TEXT = 'gemini-2.0-flash' // 高速・安定
-const MODEL_IMAGE = 'gemini-2.0-flash-exp' // 画像生成（実験的）
+const MODEL_TEXT = 'gemini-3-flash-preview' // Gemini 3 Flash - 最新・高速・高品質
+const MODEL_TEXT_PRO = 'gemini-3-pro' // Gemini 3 Pro - 最高品質
+const MODEL_IMAGE = 'nano-banana' // Nano Banana - 画像生成
 
 // ============================================
 // Phase 1: Deep Research AI（入力を深掘り・補完）
