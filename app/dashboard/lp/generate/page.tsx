@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Sparkles, Loader2, Plus, X, Zap, Target, Gift, Users } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Sparkles, Loader2, Plus, X, Zap, Target, Gift, Users, Brain, FileText, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -16,9 +17,20 @@ interface Testimonial {
   quote: string;
 }
 
+type GenerationPhase = "idle" | "researching" | "planning" | "building" | "complete";
+
+const phaseLabels: Record<GenerationPhase, { label: string; description: string; progress: number }> = {
+  idle: { label: "", description: "", progress: 0 },
+  researching: { label: "分析中", description: "AIがターゲットと課題を深掘りしています...", progress: 25 },
+  planning: { label: "設計中", description: "LP構成を設計しています...", progress: 50 },
+  building: { label: "生成中", description: "高コンバージョンなLPを生成しています...", progress: 75 },
+  complete: { label: "完了", description: "LPが完成しました！", progress: 100 },
+};
+
 export default function GenerateLPPage() {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [formData, setFormData] = useState({
     product_name: "",
     target_audience: "",
@@ -61,6 +73,7 @@ export default function GenerateLPPage() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
+    setPhase("researching");
 
     try {
       const payload = {
@@ -68,6 +81,10 @@ export default function GenerateLPPage() {
         bonuses: bonuses.filter((b) => b.trim() !== ""),
         testimonials: testimonials.filter((t) => t.name.trim() !== "" && t.quote.trim() !== ""),
       };
+
+      // フェーズを順番に進める（UIのため）
+      setTimeout(() => setPhase("planning"), 3000);
+      setTimeout(() => setPhase("building"), 6000);
 
       const response = await fetch("/api/landing-pages/generate", {
         method: "POST",
@@ -87,6 +104,8 @@ export default function GenerateLPPage() {
         ...block,
         id: crypto.randomUUID(),
       }));
+
+      setPhase("complete");
 
       // LPを保存
       const saveResponse = await fetch("/api/landing-pages", {
@@ -110,6 +129,7 @@ export default function GenerateLPPage() {
       toast.error(error instanceof Error ? error.message : "生成に失敗しました");
     } finally {
       setIsGenerating(false);
+      setPhase("idle");
     }
   };
 
@@ -341,17 +361,44 @@ export default function GenerateLPPage() {
               </CardContent>
             </Card>
 
+            {/* 生成状態表示 */}
+            {isGenerating && phase !== "idle" && (
+              <Card className="border-primary/50 bg-primary/5">
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      {phase === "researching" && <Brain className="size-5 text-primary animate-pulse" />}
+                      {phase === "planning" && <FileText className="size-5 text-primary animate-pulse" />}
+                      {phase === "building" && <Wand2 className="size-5 text-primary animate-pulse" />}
+                      {phase === "complete" && <Sparkles className="size-5 text-green-600" />}
+                      <div>
+                        <p className="font-medium">{phaseLabels[phase].label}</p>
+                        <p className="text-sm text-muted-foreground">{phaseLabels[phase].description}</p>
+                      </div>
+                    </div>
+                    <Progress value={phaseLabels[phase].progress} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>分析</span>
+                      <span>設計</span>
+                      <span>生成</span>
+                      <span>完了</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 生成ボタン */}
             <Button type="submit" disabled={isGenerating} className="w-full" size="lg">
               {isGenerating ? (
                 <>
                   <Loader2 className="size-5 mr-2 animate-spin" />
-                  AIが生成中...（30秒〜1分程度）
+                  {phaseLabels[phase].label}...
                 </>
               ) : (
                 <>
                   <Sparkles className="size-5 mr-2" />
-                  AIでLPを生成
+                  AIでLPを生成（3段階AI処理）
                 </>
               )}
             </Button>
@@ -385,10 +432,24 @@ export default function GenerateLPPage() {
                   </ul>
                 </div>
 
-                <div className="p-3 bg-primary/5 rounded-lg">
-                  <h4 className="font-medium mb-1">AI技術</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Google Gemini 2.0を使用し、構造化出力で安定したLP生成を実現しています。
+                <div className="p-3 bg-primary/5 rounded-lg space-y-2">
+                  <h4 className="font-medium">3段階AIパイプライン</h4>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Brain className="size-3" />
+                      <span>1. 深掘り分析AI</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="size-3" />
+                      <span>2. 構成設計AI</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="size-3" />
+                      <span>3. LP生成AI</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Google Geminiが3段階で思考し、高コンバージョンなLPを生成します。
                   </p>
                 </div>
               </CardContent>
