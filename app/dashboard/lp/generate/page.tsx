@@ -47,20 +47,75 @@ export default function GenerateLPPage() {
   const [bonuses, setBonuses] = useState<string[]>([""]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("画像サイズは5MB以下にしてください");
+      // 20MBまで許可（リサイズするので大きめでOK）
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error("画像サイズは20MB以下にしてください");
         return;
       }
-      setReferenceImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setReferenceImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+
+      toast.info("画像を処理中...");
+
+      try {
+        // 画像をリサイズしてBase64に変換
+        const resizedDataUrl = await resizeImage(file, 2048);
+        setReferenceImage(resizedDataUrl);
+        setReferenceImageFile(file);
+        toast.success("画像をアップロードしました");
+      } catch (error) {
+        console.error("Image processing error:", error);
+        toast.error("画像の処理に失敗しました");
+      }
     }
+  };
+
+  // 画像をリサイズする関数（縦長・横長どちらも対応）
+  const resizeImage = (file: File, maxSize: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = document.createElement("img");
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+
+          // 長辺がmaxSizeを超える場合のみリサイズ
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Canvas context not available"));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // JPEG形式で圧縮（品質0.85）
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          resolve(dataUrl);
+        };
+
+        img.onerror = () => reject(new Error("Image load failed"));
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => reject(new Error("File read failed"));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleRemoveImage = () => {
@@ -116,7 +171,8 @@ export default function GenerateLPPage() {
         // Base64データを抽出（data:image/...;base64, の部分を除去）
         const base64Data = referenceImage.split(",")[1];
         payload.referenceImage = base64Data;
-        payload.referenceImageMimeType = referenceImageFile.type;
+        // リサイズ後はJPEG形式
+        payload.referenceImageMimeType = "image/jpeg";
 
         setTimeout(() => setPhase("researching"), 2000);
         setTimeout(() => setPhase("planning"), 5000);
@@ -243,7 +299,7 @@ export default function GenerateLPPage() {
                       クリックして画像をアップロード
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      PNG, JPG, WEBP（最大5MB）
+                      PNG, JPG, WEBP（縦長フルページOK・自動リサイズ）
                     </p>
                     <input
                       id="reference-image-input"
