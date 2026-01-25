@@ -249,10 +249,17 @@ export function CampaignWizard({
         }
         return false;
       case "audience":
-        return (
-          campaignData.audienceType === "all" ||
-          campaignData.selectedTags.length > 0
-        );
+        if (campaignData.audienceType === "all") return true;
+        if (campaignData.audienceType === "tags") return campaignData.selectedTags.length > 0;
+        if (campaignData.audienceType === "specific") {
+          // Check if at least one valid email is entered
+          const emails = campaignData.specificEmails
+            .split(/[,\n]/)
+            .map((e) => e.trim())
+            .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+          return emails.length > 0;
+        }
+        return false;
       case "schedule":
         return (
           campaignData.scheduleType === "now" ||
