@@ -187,6 +187,29 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>チャネル</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {channelMenuItems.map((item) => {
+                const isActive = item.matchPaths.some(
+                  (path) => pathname === path || pathname.startsWith(path + "/")
+                );
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive}>
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
           <SidebarGroupLabel>ファネル</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -214,29 +237,6 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {contentMenuItems.map((item) => {
-                const isActive = item.matchPaths.some(
-                  (path) => pathname === path || pathname.startsWith(path + "/")
-                );
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.href}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>チャネル</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {channelMenuItems.map((item) => {
                 const isActive = item.matchPaths.some(
                   (path) => pathname === path || pathname.startsWith(path + "/")
                 );
