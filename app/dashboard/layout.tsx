@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
+import { EmailTabs } from "@/components/dashboard/email-tabs";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 export default async function DashboardLayout({
@@ -40,6 +41,7 @@ export default async function DashboardLayout({
       <DashboardSidebar user={user} />
       <SidebarInset>
         <DashboardHeader />
+        <EmailTabs />
         <div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>

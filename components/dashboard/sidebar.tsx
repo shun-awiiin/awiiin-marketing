@@ -26,72 +26,62 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Mail,
-  LayoutDashboard,
-  Users,
-  FileText,
-  Send,
-  BarChart3,
   Settings,
   LogOut,
   ChevronUp,
-  Tag,
-  Shield,
-  GitBranch,
-  Filter,
   MessageSquare,
-  Share2,
+  Youtube,
+  Instagram,
+  MessageCircle,
 } from "lucide-react";
+import { XIcon } from "@/components/icons/x-icon";
 
-const menuItems = [
+const channelMenuItems = [
   {
-    title: "ダッシュボード",
-    icon: LayoutDashboard,
+    title: "メールマーケティング",
+    icon: Mail,
     href: "/dashboard",
+    matchPaths: [
+      "/dashboard",
+      "/dashboard/campaigns",
+      "/dashboard/scenarios",
+      "/dashboard/segments",
+      "/dashboard/contacts",
+      "/dashboard/tags",
+      "/dashboard/templates",
+      "/dashboard/deliverability",
+      "/dashboard/analytics",
+    ],
   },
   {
-    title: "キャンペーン",
-    icon: Send,
-    href: "/dashboard/campaigns",
+    title: "LINE",
+    icon: MessageSquare,
+    href: "/dashboard/line",
+    matchPaths: ["/dashboard/line"],
   },
   {
-    title: "シナリオ",
-    icon: GitBranch,
-    href: "/dashboard/scenarios",
+    title: "YouTube",
+    icon: Youtube,
+    href: "/dashboard/youtube",
+    matchPaths: ["/dashboard/youtube"],
   },
   {
-    title: "セグメント",
-    icon: Filter,
-    href: "/dashboard/segments",
+    title: "X",
+    icon: XIcon,
+    href: "/dashboard/x",
+    matchPaths: ["/dashboard/x"],
   },
   {
-    title: "連絡先",
-    icon: Users,
-    href: "/dashboard/contacts",
+    title: "Instagram",
+    icon: Instagram,
+    href: "/dashboard/instagram",
+    matchPaths: ["/dashboard/instagram"],
   },
   {
-    title: "タグ",
-    icon: Tag,
-    href: "/dashboard/tags",
-  },
-  {
-    title: "テンプレート",
-    icon: FileText,
-    href: "/dashboard/templates",
-  },
-  {
-    title: "配信品質",
-    icon: Shield,
-    href: "/dashboard/deliverability",
-  },
-  {
-    title: "分析",
-    icon: BarChart3,
-    href: "/dashboard/analytics",
-  },
-  {
-    title: "SNS投稿",
-    icon: Share2,
-    href: "/dashboard/social",
+    title: "WhatsApp",
+    icon: MessageCircle,
+    href: "/dashboard/whatsapp",
+    matchPaths: ["/dashboard/whatsapp"],
   },
 ];
 
@@ -137,19 +127,24 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
+          <SidebarGroupLabel>チャネル</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href}>
-                    <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {channelMenuItems.map((item) => {
+                const isActive = item.matchPaths.some(
+                  (path) => pathname === path || pathname.startsWith(path + "/")
+                );
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive}>
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -161,29 +156,7 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === "/dashboard/settings/line"}
-                >
-                  <Link href="/dashboard/settings/line">
-                    <MessageSquare className="size-4" />
-                    <span>LINE連携</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/dashboard/settings/dns"}
-                >
-                  <Link href="/dashboard/settings/dns">
-                    <Shield className="size-4" />
-                    <span>DNS設定</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/dashboard/settings"}
+                  isActive={pathname.startsWith("/dashboard/settings")}
                 >
                   <Link href="/dashboard/settings">
                     <Settings className="size-4" />
