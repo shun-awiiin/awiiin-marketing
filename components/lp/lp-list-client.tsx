@@ -135,8 +135,10 @@ export function LPListClient({ landingPages }: LPListClientProps) {
               </TableHeader>
               <TableBody>
                 {landingPages.map((lp) => {
-                  const cvr = lp.view_count > 0
-                    ? ((lp.form_submission_count / lp.view_count) * 100).toFixed(1)
+                  const viewCount = lp.view_count ?? 0;
+                  const formCount = lp.form_submission_count ?? 0;
+                  const cvr = viewCount > 0
+                    ? ((formCount / viewCount) * 100).toFixed(1)
                     : "0.0";
                   const status = statusLabels[lp.status] || statusLabels.draft;
 
@@ -154,10 +156,10 @@ export function LPListClient({ landingPages }: LPListClientProps) {
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {lp.view_count.toLocaleString()}
+                        {viewCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        {lp.form_submission_count.toLocaleString()}
+                        {formCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">{cvr}%</TableCell>
                       <TableCell>
