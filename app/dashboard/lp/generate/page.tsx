@@ -234,9 +234,9 @@ export default function GenerateLPPage() {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
+                  <label
+                    htmlFor="reference-image-input"
+                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors block"
                   >
                     <Upload className="size-10 mx-auto text-muted-foreground mb-4" />
                     <p className="text-sm text-muted-foreground mb-2">
@@ -245,16 +245,17 @@ export default function GenerateLPPage() {
                     <p className="text-xs text-muted-foreground">
                       PNG, JPG, WEBP（最大5MB）
                     </p>
-                  </div>
+                    <input
+                      id="reference-image-input"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={isGenerating}
+                    />
+                  </label>
                 )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={isGenerating}
-                />
               </CardContent>
             </Card>
 
