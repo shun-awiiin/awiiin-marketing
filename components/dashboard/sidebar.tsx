@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -152,13 +153,32 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ user }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     router.push("/auth/login");
     router.refresh();
-  };
+  }, [supabase, router]);
+
+  // アクティブ状態をメモ化
+  const activeStates = useMemo(() => {
+    const checkActive = (matchPaths: string[]) =>
+      matchPaths.some(
+        (path) => pathname === path || pathname.startsWith(path + "/")
+      );
+
+    return {
+      channels: channelMenuItems.map((item) => checkActive(item.matchPaths)),
+      funnels: funnelMenuItems.map((item) => checkActive(item.matchPaths)),
+      contents: contentMenuItems.map((item) => checkActive(item.matchPaths)),
+      settings: {
+        line: pathname === "/dashboard/settings/line",
+        dns: pathname === "/dashboard/settings/dns",
+        main: pathname === "/dashboard/settings",
+      },
+    };
+  }, [pathname]);
 
   const userName = user.user_metadata?.name || user.email?.split("@")[0] || "User";
   const userInitial = userName.charAt(0).toUpperCase();
@@ -190,21 +210,16 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
           <SidebarGroupLabel>チャネル</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {channelMenuItems.map((item) => {
-                const isActive = item.matchPaths.some(
-                  (path) => pathname === path || pathname.startsWith(path + "/")
-                );
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.href}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {channelMenuItems.map((item, index) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={activeStates.channels[index]}>
+                    <Link href={item.href} prefetch={true}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -213,21 +228,16 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
           <SidebarGroupLabel>ファネル</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {funnelMenuItems.map((item) => {
-                const isActive = item.matchPaths.some(
-                  (path) => pathname === path || pathname.startsWith(path + "/")
-                );
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.href}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {funnelMenuItems.map((item, index) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={activeStates.funnels[index]}>
+                    <Link href={item.href} prefetch={true}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -236,21 +246,16 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
           <SidebarGroupLabel>コンテンツ</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {contentMenuItems.map((item) => {
-                const isActive = item.matchPaths.some(
-                  (path) => pathname === path || pathname.startsWith(path + "/")
-                );
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.href}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {contentMenuItems.map((item, index) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={activeStates.contents[index]}>
+                    <Link href={item.href} prefetch={true}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -262,9 +267,9 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === "/dashboard/settings/line"}
+                  isActive={activeStates.settings.line}
                 >
-                  <Link href="/dashboard/settings/line">
+                  <Link href="/dashboard/settings/line" prefetch={true}>
                     <MessageSquare className="size-4" />
                     <span>LINE連携</span>
                   </Link>
@@ -273,9 +278,9 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === "/dashboard/settings/dns"}
+                  isActive={activeStates.settings.dns}
                 >
-                  <Link href="/dashboard/settings/dns">
+                  <Link href="/dashboard/settings/dns" prefetch={true}>
                     <Shield className="size-4" />
                     <span>DNS設定</span>
                   </Link>
@@ -284,9 +289,9 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === "/dashboard/settings"}
+                  isActive={activeStates.settings.main}
                 >
-                  <Link href="/dashboard/settings">
+                  <Link href="/dashboard/settings" prefetch={true}>
                     <Settings className="size-4" />
                     <span>設定</span>
                   </Link>

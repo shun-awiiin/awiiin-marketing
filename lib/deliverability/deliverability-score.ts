@@ -3,6 +3,7 @@
  * Calculates comprehensive deliverability score from multiple factors
  */
 
+import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import {
   getOverallDomainHealthScore,
@@ -26,9 +27,9 @@ import { DELIVERABILITY_WEIGHTS } from '@/lib/types/deliverability';
 // ============================================
 
 /**
- * Calculate comprehensive deliverability score
+ * Internal function to calculate deliverability score
  */
-export async function calculateDeliverabilityScore(
+async function calculateDeliverabilityScoreInternal(
   userId: string,
   domain?: string
 ): Promise<DeliverabilityScore> {
@@ -95,6 +96,25 @@ export async function calculateDeliverabilityScore(
     recommendations,
     last_updated: new Date().toISOString(),
   };
+}
+
+/**
+ * Calculate comprehensive deliverability score (cached for 5 minutes)
+ */
+export async function calculateDeliverabilityScore(
+  userId: string,
+  domain?: string
+): Promise<DeliverabilityScore> {
+  const getCachedScore = unstable_cache(
+    async () => calculateDeliverabilityScoreInternal(userId, domain),
+    [`deliverability-score-${userId}-${domain || 'default'}`],
+    {
+      revalidate: 300, // 5 minutes
+      tags: [`deliverability-${userId}`],
+    }
+  );
+
+  return getCachedScore();
 }
 
 /**

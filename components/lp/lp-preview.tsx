@@ -329,7 +329,7 @@ function IframePreview({ html }: { html: string }) {
       ref={iframeRef}
       className="w-full min-h-[600px] border-0"
       title="LP Preview"
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-scripts"
     />
   );
 }

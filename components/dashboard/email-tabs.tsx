@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -110,26 +111,32 @@ export function EmailTabs() {
   const pathname = usePathname();
 
   // メール関連のパスでない場合は表示しない
-  if (!isEmailPath(pathname)) {
+  const shouldShow = useMemo(() => isEmailPath(pathname), [pathname]);
+
+  // アクティブなタブのインデックスをメモ化
+  const activeTabIndex = useMemo(() => {
+    return emailTabs.findIndex((tab) => {
+      if (tab.exact) {
+        return pathname === tab.href;
+      }
+      return pathname === tab.href || pathname.startsWith(tab.href + "/");
+    });
+  }, [pathname]);
+
+  if (!shouldShow) {
     return null;
   }
-
-  const isActive = (tab: (typeof emailTabs)[number]) => {
-    if (tab.exact) {
-      return pathname === tab.href;
-    }
-    return pathname === tab.href || pathname.startsWith(tab.href + "/");
-  };
 
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex overflow-x-auto scrollbar-hide">
-        {emailTabs.map((tab) => {
-          const active = isActive(tab);
+        {emailTabs.map((tab, index) => {
+          const active = index === activeTabIndex;
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch={true}
               className={cn(
                 "flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
                 active

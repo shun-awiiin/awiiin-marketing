@@ -28,65 +28,65 @@ import { ClientNumber } from "@/components/ui/client-number";
 async function getAnalytics(userId: string) {
   const supabase = await createClient();
 
-  // 総送信数
-  const { count: totalMessages } = await supabase
-    .from("messages")
-    .select("*", { count: "exact", head: true });
+  // 並列でクエリを実行
+  const [
+    totalMessagesResult,
+    statusCountsResult,
+    unsubscribeResult,
+    recentEventsResult,
+    campaignsWithMessagesResult,
+  ] = await Promise.all([
+    // 総送信数
+    supabase.from("messages").select("*", { count: "exact", head: true }),
+    // ステータス別集計
+    supabase.from("messages").select("status"),
+    // 配信停止数
+    supabase.from("unsubscribes").select("*", { count: "exact", head: true }),
+    // 最近のイベント
+    supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20),
+    // キャンペーンとメッセージを一緒に取得（N+1クエリ解消）
+    supabase
+      .from("campaigns")
+      .select("id, name, status, created_at, messages(status)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
 
-  // ステータス別集計
-  const { data: statusCounts } = await supabase
-    .from("messages")
-    .select("status");
-
+  const statusCounts = statusCountsResult.data;
   const stats = {
-    total: totalMessages ?? 0,
+    total: totalMessagesResult.count ?? 0,
     sent: statusCounts?.filter((m) => m.status === "sent").length ?? 0,
     failed: statusCounts?.filter((m) => m.status === "failed").length ?? 0,
     bounced: statusCounts?.filter((m) => m.status === "bounced").length ?? 0,
     pending: statusCounts?.filter((m) => m.status === "pending").length ?? 0,
   };
 
-  // 配信停止数
-  const { count: unsubscribeCount } = await supabase
-    .from("unsubscribes")
-    .select("*", { count: "exact", head: true });
-
-  // 最近のイベント
-  const { data: recentEvents } = await supabase
-    .from("events")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  // キャンペーン別統計
-  const { data: campaigns } = await supabase
-    .from("campaigns")
-    .select("id, name, status, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  const campaignStats = await Promise.all(
-    (campaigns ?? []).map(async (campaign) => {
-      const { data: messages } = await supabase
-        .from("messages")
-        .select("status")
-        .eq("campaign_id", campaign.id);
-
+  // キャンペーン統計を計算（JOINされたデータから）
+  const campaignStats = (campaignsWithMessagesResult.data ?? []).map(
+    (campaign) => {
+      const messages = campaign.messages || [];
       return {
-        ...campaign,
-        total: messages?.length ?? 0,
-        sent: messages?.filter((m) => m.status === "sent").length ?? 0,
-        failed: messages?.filter((m) => m.status === "failed").length ?? 0,
-        bounced: messages?.filter((m) => m.status === "bounced").length ?? 0,
+        id: campaign.id,
+        name: campaign.name,
+        status: campaign.status,
+        created_at: campaign.created_at,
+        total: messages.length,
+        sent: messages.filter((m: { status: string }) => m.status === "sent").length,
+        failed: messages.filter((m: { status: string }) => m.status === "failed").length,
+        bounced: messages.filter((m: { status: string }) => m.status === "bounced").length,
       };
-    })
+    }
   );
 
   return {
     stats,
-    unsubscribeCount: unsubscribeCount ?? 0,
-    recentEvents: recentEvents ?? [],
+    unsubscribeCount: unsubscribeResult.count ?? 0,
+    recentEvents: recentEventsResult.data ?? [],
     campaignStats,
   };
 }
