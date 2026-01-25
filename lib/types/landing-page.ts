@@ -261,9 +261,9 @@ export const blockSettingsSchema = z.object({
 
 export const lpBlockSchema = z.object({
   id: z.string().uuid(),
-  type: z.enum(['hero', 'problem', 'solution', 'features', 'testimonials', 'pricing', 'bonus', 'faq', 'cta', 'form', 'video', 'countdown']),
+  type: z.enum(['hero', 'problem', 'solution', 'features', 'testimonials', 'pricing', 'bonus', 'faq', 'cta', 'form', 'video', 'countdown', 'html']),
   content: z.record(z.unknown()),
-  settings: blockSettingsSchema,
+  settings: blockSettingsSchema.optional().default({}),
 })
 
 export const createLandingPageSchema = z.object({
