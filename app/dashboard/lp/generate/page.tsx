@@ -194,11 +194,11 @@ export default function GenerateLPPage() {
       }
 
       const data = await response.json();
-      const { html, css, title, meta_description } = data.data;
+      const { sections, globalCss, title, meta_description } = data.data;
 
       setPhase("complete");
 
-      // HTMLベースでLPを保存（blocksにhtml/cssを格納）
+      // セクションベースでLPを保存
       const saveResponse = await fetch("/api/landing-pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -208,7 +208,11 @@ export default function GenerateLPPage() {
           blocks: [{
             id: crypto.randomUUID(),
             type: "html",
-            content: { html, css, meta_description },
+            content: { 
+              sections: sections || [],
+              globalCss: globalCss || "",
+              meta_description,
+            },
             settings: { padding: "none", width: "full" },
           }],
         }),

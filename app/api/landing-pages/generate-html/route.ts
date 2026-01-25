@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import {
   generateLPHTML,
   analyzeReferenceImage,
-  refineLPHTML,
+  editSection,
+  generateSection,
+  type LPSection,
+  type LPGenerationInput,
 } from '@/lib/lp/html-generator'
 import { z } from 'zod'
 
@@ -28,10 +31,23 @@ const generateSchema = z.object({
   referenceImageMimeType: z.string().optional(),
 })
 
-const refineSchema = z.object({
-  current_html: z.string(),
-  current_css: z.string(),
-  instruction: z.string().min(1, '修正指示は必須です'),
+// セクション編集スキーマ
+const editSectionSchema = z.object({
+  section: z.object({
+    id: z.string(),
+    type: z.string(),
+    html: z.string(),
+    order: z.number(),
+  }),
+  instruction: z.string().min(1, '編集指示は必須です'),
+  input: generateSchema.partial(),
+})
+
+// セクション再生成スキーマ
+const regenerateSectionSchema = z.object({
+  sectionType: z.string(),
+  customInstruction: z.string().optional(),
+  input: generateSchema.partial(),
 })
 
 export async function POST(request: NextRequest) {
@@ -52,9 +68,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    // リファインリクエストの場合
-    if (body.current_html && body.instruction) {
-      const validation = refineSchema.safeParse(body)
+    // セクション編集リクエスト
+    if (body.section && body.instruction) {
+      const validation = editSectionSchema.safeParse(body)
 
       if (!validation.success) {
         return NextResponse.json(
@@ -63,19 +79,44 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const result = await refineLPHTML(
-        validation.data.current_html,
-        validation.data.current_css,
-        validation.data.instruction
+      const input = validation.data.input as LPGenerationInput
+      const result = await editSection(
+        validation.data.section as LPSection,
+        validation.data.instruction,
+        input
       )
 
       return NextResponse.json({
         success: true,
-        data: result,
+        data: { section: result },
       })
     }
 
-    // 新規生成リクエスト
+    // セクション再生成リクエスト
+    if (body.sectionType && body.input) {
+      const validation = regenerateSectionSchema.safeParse(body)
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { success: false, error: validation.error.errors[0].message },
+          { status: 400 }
+        )
+      }
+
+      const input = validation.data.input as LPGenerationInput
+      const result = await generateSection(
+        validation.data.sectionType,
+        input,
+        validation.data.customInstruction
+      )
+
+      return NextResponse.json({
+        success: true,
+        data: { section: result },
+      })
+    }
+
+    // 新規LP生成リクエスト
     const validation = generateSchema.safeParse(body)
 
     if (!validation.success) {
@@ -95,7 +136,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // HTML生成
+    // セクションベースでLP生成
     const result = await generateLPHTML(validation.data, imageAnalysis)
 
     // 生成履歴を保存
@@ -106,14 +147,14 @@ export async function POST(request: NextRequest) {
         referenceImage: validation.data.referenceImage ? '[BASE64_IMAGE]' : undefined,
         imageAnalysis,
       }),
-      generated_blocks: { html: result.html, css: result.css },
+      generated_blocks: { sections: result.sections, globalCss: result.globalCss },
     })
 
     return NextResponse.json({
       success: true,
       data: {
-        html: result.html,
-        css: result.css,
+        sections: result.sections,
+        globalCss: result.globalCss,
         title: result.title,
         meta_description: result.meta_description,
         imageAnalysis,

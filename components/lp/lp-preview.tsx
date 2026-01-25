@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Pencil, RotateCcw, GripVertical, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+
+interface LPSection {
+  id: string;
+  type: string;
+  html: string;
+  order: number;
+}
 
 interface LPBlock {
   id: string;
@@ -17,6 +26,11 @@ interface LPBlock {
 
 interface LPPreviewProps {
   blocks: unknown[];
+  editable?: boolean;
+  onSectionEdit?: (section: LPSection, instruction: string) => void;
+  onSectionRegenerate?: (sectionType: string) => void;
+  onSectionsReorder?: (sections: LPSection[]) => void;
+  onSectionDelete?: (sectionId: string) => void;
 }
 
 const paddingClasses = {
@@ -31,7 +45,25 @@ const widthClasses = {
   full: "max-w-full",
 };
 
-export function LPPreview({ blocks }: LPPreviewProps) {
+const sectionTypeLabels: Record<string, string> = {
+  hero: "ヒーロー",
+  problem: "問題提起",
+  empathy: "共感",
+  solution: "解決策",
+  features: "特徴",
+  testimonials: "お客様の声",
+  faq: "FAQ",
+  cta: "CTA",
+};
+
+export function LPPreview({ 
+  blocks, 
+  editable = false,
+  onSectionEdit,
+  onSectionRegenerate,
+  onSectionsReorder,
+  onSectionDelete,
+}: LPPreviewProps) {
   const typedBlocks = blocks as LPBlock[];
 
   if (!typedBlocks.length) {
@@ -45,7 +77,16 @@ export function LPPreview({ blocks }: LPPreviewProps) {
   // HTMLブロックがある場合はHTMLプレビューを表示
   const htmlBlock = typedBlocks.find((b) => b.type === "html");
   if (htmlBlock) {
-    return <HTMLPreview block={htmlBlock} />;
+    return (
+      <SectionBasedPreview 
+        block={htmlBlock} 
+        editable={editable}
+        onSectionEdit={onSectionEdit}
+        onSectionRegenerate={onSectionRegenerate}
+        onSectionsReorder={onSectionsReorder}
+        onSectionDelete={onSectionDelete}
+      />
+    );
   }
 
   return (
@@ -57,35 +98,219 @@ export function LPPreview({ blocks }: LPPreviewProps) {
   );
 }
 
-// HTMLブロック用のプレビューコンポーネント（iframe使用）
-function HTMLPreview({ block }: { block: LPBlock }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const content = block.content as { html?: string; css?: string };
+// セクションベースのプレビュー（編集可能）
+function SectionBasedPreview({ 
+  block, 
+  editable,
+  onSectionEdit,
+  onSectionRegenerate,
+  onSectionsReorder,
+  onSectionDelete,
+}: { 
+  block: LPBlock;
+  editable?: boolean;
+  onSectionEdit?: (section: LPSection, instruction: string) => void;
+  onSectionRegenerate?: (sectionType: string) => void;
+  onSectionsReorder?: (sections: LPSection[]) => void;
+  onSectionDelete?: (sectionId: string) => void;
+}) {
+  const content = block.content as { 
+    sections?: LPSection[]; 
+    globalCss?: string;
+    // 旧形式対応
+    html?: string;
+    css?: string;
+  };
+
+  // 旧形式（html/css直接）の場合
+  if (content.html && !content.sections) {
+    return <LegacyHTMLPreview html={content.html} css={content.css || ""} />;
+  }
+
+  const [sections, setSections] = useState<LPSection[]>(content.sections || []);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editInstruction, setEditInstruction] = useState("");
 
   useEffect(() => {
-    if (iframeRef.current && content.html) {
+    setSections(content.sections || []);
+  }, [content.sections]);
+
+  const handleMoveSection = (index: number, direction: "up" | "down") => {
+    const newSections = [...sections];
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newSections.length) return;
+    
+    [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+    newSections.forEach((s, i) => s.order = i);
+    setSections(newSections);
+    onSectionsReorder?.(newSections);
+  };
+
+  const handleEditSubmit = (section: LPSection) => {
+    if (editInstruction.trim()) {
+      onSectionEdit?.(section, editInstruction);
+      setEditingSection(null);
+      setEditInstruction("");
+    }
+  };
+
+  if (!sections.length) {
+    return (
+      <div className="flex items-center justify-center h-96 text-muted-foreground">
+        セクションがありません
+      </div>
+    );
+  }
+
+  // 全セクションを結合してiframeで表示
+  const fullHtml = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${content.globalCss || ""}</style>
+</head>
+<body style="margin:0;padding:0;">
+  ${sections.sort((a, b) => a.order - b.order).map(s => s.html).join("\n")}
+</body>
+</html>
+`;
+
+  return (
+    <div className="space-y-4">
+      {/* プレビュー */}
+      <div className="bg-white rounded-lg overflow-hidden border">
+        <IframePreview html={fullHtml} />
+      </div>
+
+      {/* 編集モード時のセクションリスト */}
+      {editable && (
+        <div className="space-y-2">
+          <h3 className="font-medium text-sm text-muted-foreground">セクション編集</h3>
+          {sections.sort((a, b) => a.order - b.order).map((section, index) => (
+            <div 
+              key={section.id} 
+              className="border rounded-lg p-3 bg-card"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GripVertical className="size-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {sectionTypeLabels[section.type] || section.type}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleMoveSection(index, "up")}
+                    disabled={index === 0}
+                  >
+                    <ChevronUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleMoveSection(index, "down")}
+                    disabled={index === sections.length - 1}
+                  >
+                    <ChevronDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setEditingSection(editingSection === section.id ? null : section.id)}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onSectionRegenerate?.(section.type)}
+                  >
+                    <RotateCcw className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => onSectionDelete?.(section.id)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* 編集フォーム */}
+              {editingSection === section.id && (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    className="w-full p-2 border rounded text-sm"
+                    rows={2}
+                    placeholder="編集指示を入力（例：見出しをもっとインパクトのあるものに変更）"
+                    value={editInstruction}
+                    onChange={(e) => setEditInstruction(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleEditSubmit(section)}
+                      disabled={!editInstruction.trim()}
+                    >
+                      編集を適用
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        setEditingSection(null);
+                        setEditInstruction("");
+                      }}
+                    >
+                      キャンセル
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 旧形式HTML用プレビュー
+function LegacyHTMLPreview({ html, css }: { html: string; css: string }) {
+  let fullHtml = html;
+  if (css) {
+    const styleTag = `<style>${css}</style>`;
+    if (fullHtml.includes("</head>")) {
+      fullHtml = fullHtml.replace("</head>", `${styleTag}</head>`);
+    } else {
+      fullHtml = `${styleTag}${fullHtml}`;
+    }
+  }
+  return <IframePreview html={fullHtml} />;
+}
+
+// iframeプレビュー共通コンポーネント
+function IframePreview({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (iframeRef.current) {
       const doc = iframeRef.current.contentDocument;
       if (doc) {
-        // HTMLにCSSを埋め込む
-        let fullHtml = content.html;
-        
-        // CSSがある場合は<head>に挿入
-        if (content.css) {
-          const styleTag = `<style>${content.css}</style>`;
-          if (fullHtml.includes("</head>")) {
-            fullHtml = fullHtml.replace("</head>", `${styleTag}</head>`);
-          } else if (fullHtml.includes("<body")) {
-            fullHtml = fullHtml.replace("<body", `<head>${styleTag}</head><body`);
-          } else {
-            fullHtml = `<style>${content.css}</style>${fullHtml}`;
-          }
-        }
-
         doc.open();
-        doc.write(fullHtml);
+        doc.write(html);
         doc.close();
 
-        // iframe高さを自動調整
         const adjustHeight = () => {
           if (iframeRef.current && doc.body) {
             const height = doc.body.scrollHeight;
@@ -93,46 +318,19 @@ function HTMLPreview({ block }: { block: LPBlock }) {
           }
         };
 
-        // 画像読み込み完了後に再調整
-        const images = doc.images;
-        let loadedImages = 0;
-        if (images.length === 0) {
-          adjustHeight();
-        } else {
-          for (let i = 0; i < images.length; i++) {
-            images[i].onload = () => {
-              loadedImages++;
-              if (loadedImages === images.length) {
-                adjustHeight();
-              }
-            };
-          }
-        }
-
-        // 少し遅延させてから高さ調整
         setTimeout(adjustHeight, 100);
         setTimeout(adjustHeight, 500);
       }
     }
-  }, [content.html, content.css]);
-
-  if (!content.html) {
-    return (
-      <div className="flex items-center justify-center h-96 text-muted-foreground">
-        HTMLコンテンツがありません
-      </div>
-    );
-  }
+  }, [html]);
 
   return (
-    <div className="w-full bg-white rounded-lg overflow-hidden border">
-      <iframe
-        ref={iframeRef}
-        className="w-full min-h-[600px] border-0"
-        title="LP Preview"
-        sandbox="allow-same-origin"
-      />
-    </div>
+    <iframe
+      ref={iframeRef}
+      className="w-full min-h-[600px] border-0"
+      title="LP Preview"
+      sandbox="allow-same-origin"
+    />
   );
 }
 
