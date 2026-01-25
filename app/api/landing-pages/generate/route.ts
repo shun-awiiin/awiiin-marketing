@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateLPContent, refineLPContent } from '@/lib/lp/ai-generator'
+import { generateLPContent, refineLPContent, analyzeImageForLP, generateLPFromImage } from '@/lib/lp/ai-generator'
 import { z } from 'zod'
 
 const generateSchema = z.object({
@@ -15,6 +15,9 @@ const generateSchema = z.object({
     name: z.string(),
     quote: z.string(),
   })).optional(),
+  // 参考画像（Base64）
+  referenceImage: z.string().optional(),
+  referenceImageMimeType: z.string().optional(),
 })
 
 const refineSchema = z.object({
@@ -72,18 +75,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const blocks = await generateLPContent(validation.data)
+    let blocks
+    let imageAnalysis = null
+
+    // 参考画像がある場合は画像分析を先に行う
+    if (validation.data.referenceImage && validation.data.referenceImageMimeType) {
+      imageAnalysis = await analyzeImageForLP(
+        validation.data.referenceImage,
+        validation.data.referenceImageMimeType
+      )
+
+      if (imageAnalysis) {
+        // 画像分析結果を元にLP生成
+        blocks = await generateLPFromImage(imageAnalysis, validation.data)
+      } else {
+        // 画像分析失敗時は通常生成
+        blocks = await generateLPContent(validation.data)
+      }
+    } else {
+      // 通常のLP生成
+      blocks = await generateLPContent(validation.data)
+    }
 
     // Save generation history
     await supabase.from('lp_generation_history').insert({
       user_id: user.id,
-      prompt: JSON.stringify(validation.data),
+      prompt: JSON.stringify({
+        ...validation.data,
+        referenceImage: validation.data.referenceImage ? '[BASE64_IMAGE]' : undefined,
+        imageAnalysis: imageAnalysis,
+      }),
       generated_blocks: blocks,
     })
 
     return NextResponse.json({
       success: true,
-      data: { blocks },
+      data: { blocks, imageAnalysis },
     })
   } catch (error) {
     return NextResponse.json(

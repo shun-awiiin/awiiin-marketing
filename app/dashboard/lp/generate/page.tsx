@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Sparkles, Loader2, Plus, X, Zap, Target, Gift, Users, Brain, FileText, Wand2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Plus, X, Zap, Target, Gift, Users, Brain, FileText, Wand2, ImageIcon, Upload, Eye } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -17,20 +18,24 @@ interface Testimonial {
   quote: string;
 }
 
-type GenerationPhase = "idle" | "researching" | "planning" | "building" | "complete";
+type GenerationPhase = "idle" | "analyzing" | "researching" | "planning" | "building" | "complete";
 
 const phaseLabels: Record<GenerationPhase, { label: string; description: string; progress: number }> = {
   idle: { label: "", description: "", progress: 0 },
-  researching: { label: "分析中", description: "AIがターゲットと課題を深掘りしています...", progress: 25 },
-  planning: { label: "設計中", description: "LP構成を設計しています...", progress: 50 },
-  building: { label: "生成中", description: "高コンバージョンなLPを生成しています...", progress: 75 },
+  analyzing: { label: "画像分析中", description: "参考デザインの構成を解析しています...", progress: 15 },
+  researching: { label: "深掘り分析中", description: "AIがターゲットと課題を深掘りしています...", progress: 35 },
+  planning: { label: "設計中", description: "LP構成を設計しています...", progress: 55 },
+  building: { label: "生成中", description: "高コンバージョンなLPを生成しています...", progress: 80 },
   complete: { label: "完了", description: "LPが完成しました！", progress: 100 },
 };
 
 export default function GenerateLPPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [phase, setPhase] = useState<GenerationPhase>("idle");
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImageFile, setReferenceImageFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     product_name: "",
     target_audience: "",
@@ -41,6 +46,30 @@ export default function GenerateLPPage() {
   });
   const [bonuses, setBonuses] = useState<string[]>([""]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("画像サイズは5MB以下にしてください");
+        return;
+      }
+      setReferenceImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setReferenceImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setReferenceImage(null);
+    setReferenceImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleAddBonus = () => {
     setBonuses([...bonuses, ""]);
@@ -73,18 +102,30 @@ export default function GenerateLPPage() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
-    setPhase("researching");
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...formData,
         bonuses: bonuses.filter((b) => b.trim() !== ""),
         testimonials: testimonials.filter((t) => t.name.trim() !== "" && t.quote.trim() !== ""),
       };
 
-      // フェーズを順番に進める（UIのため）
-      setTimeout(() => setPhase("planning"), 3000);
-      setTimeout(() => setPhase("building"), 6000);
+      // 参考画像がある場合は画像分析から開始
+      if (referenceImage && referenceImageFile) {
+        setPhase("analyzing");
+        // Base64データを抽出（data:image/...;base64, の部分を除去）
+        const base64Data = referenceImage.split(",")[1];
+        payload.referenceImage = base64Data;
+        payload.referenceImageMimeType = referenceImageFile.type;
+
+        setTimeout(() => setPhase("researching"), 2000);
+        setTimeout(() => setPhase("planning"), 5000);
+        setTimeout(() => setPhase("building"), 8000);
+      } else {
+        setPhase("researching");
+        setTimeout(() => setPhase("planning"), 3000);
+        setTimeout(() => setPhase("building"), 6000);
+      }
 
       const response = await fetch("/api/landing-pages/generate", {
         method: "POST",
@@ -152,6 +193,71 @@ export default function GenerateLPPage() {
       <form onSubmit={handleGenerate}>
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
+            {/* 参考画像アップロード */}
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ImageIcon className="size-5 text-primary" />
+                  参考デザイン（任意）
+                </CardTitle>
+                <CardDescription>
+                  参考にしたいLP/Webサイトのスクリーンショットをアップロードすると、
+                  そのデザイン構成を解析してLPに反映します
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {referenceImage ? (
+                  <div className="space-y-4">
+                    <div className="relative aspect-video border rounded-lg overflow-hidden bg-muted">
+                      <Image
+                        src={referenceImage}
+                        alt="参考画像"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Eye className="size-4" />
+                        この画像の構成を解析してLPを生成します
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        disabled={isGenerating}
+                      >
+                        <X className="size-4 mr-2" />
+                        削除
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="size-10 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      クリックして画像をアップロード
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, WEBP（最大5MB）
+                    </p>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  disabled={isGenerating}
+                />
+              </CardContent>
+            </Card>
+
             {/* 基本情報 */}
             <Card>
               <CardHeader>
@@ -367,6 +473,7 @@ export default function GenerateLPPage() {
                 <CardContent className="pt-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
+                      {phase === "analyzing" && <ImageIcon className="size-5 text-primary animate-pulse" />}
                       {phase === "researching" && <Brain className="size-5 text-primary animate-pulse" />}
                       {phase === "planning" && <FileText className="size-5 text-primary animate-pulse" />}
                       {phase === "building" && <Wand2 className="size-5 text-primary animate-pulse" />}
@@ -378,10 +485,21 @@ export default function GenerateLPPage() {
                     </div>
                     <Progress value={phaseLabels[phase].progress} className="h-2" />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>分析</span>
-                      <span>設計</span>
-                      <span>生成</span>
-                      <span>完了</span>
+                      {referenceImage ? (
+                        <>
+                          <span>画像解析</span>
+                          <span>深掘り</span>
+                          <span>設計</span>
+                          <span>生成</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>深掘り</span>
+                          <span>設計</span>
+                          <span>生成</span>
+                          <span>完了</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>

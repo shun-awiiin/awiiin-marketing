@@ -599,6 +599,268 @@ export async function generateHeroImage(
   return null
 }
 
+// ============================================
+// 画像からLP構成を解析（スクリーンショット対応）
+// ============================================
+
+const IMAGE_ANALYSIS_PROMPT = `あなたはLP/Webデザインの専門家です。
+アップロードされた画像（LPやWebサイトのスクリーンショット）を分析し、
+そのデザイン構成・レイアウト・雰囲気を詳細に抽出してください。
+
+## 分析すべき項目
+
+1. **全体の雰囲気・トーン**
+   - カラースキーム（メインカラー、アクセントカラー）
+   - デザインスタイル（モダン、ミニマル、コーポレート、カジュアル等）
+   - フォントの印象（太め、細め、丸み等）
+
+2. **セクション構成**
+   - ファーストビュー（Hero）の構成
+   - 各セクションの順番と内容
+   - CTAの配置と数
+
+3. **レイアウトの特徴**
+   - カラム構成（1カラム、2カラム等）
+   - 余白の使い方
+   - 画像と文字のバランス
+
+4. **特徴的な要素**
+   - アイコンの使い方
+   - カード型デザインの有無
+   - アニメーション・動きの示唆
+
+日本語で出力してください。`
+
+const IMAGE_ANALYSIS_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    design_style: {
+      type: SchemaType.OBJECT,
+      properties: {
+        overall_tone: { type: SchemaType.STRING, description: '全体の雰囲気（モダン、ミニマル、コーポレート、カジュアル等）' },
+        main_color: { type: SchemaType.STRING, description: 'メインカラー（例：#3B82F6、青系）' },
+        accent_color: { type: SchemaType.STRING, description: 'アクセントカラー' },
+        font_style: { type: SchemaType.STRING, description: 'フォントの印象' },
+      },
+      required: ['overall_tone', 'main_color'],
+    },
+    sections: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          type: { type: SchemaType.STRING, description: 'セクションタイプ（hero, features, testimonials等）' },
+          layout: { type: SchemaType.STRING, description: 'レイアウト（1カラム、2カラム、グリッド等）' },
+          description: { type: SchemaType.STRING, description: '内容の説明' },
+        },
+        required: ['type', 'description'],
+      },
+      description: 'セクション構成の配列',
+    },
+    cta_style: {
+      type: SchemaType.OBJECT,
+      properties: {
+        button_style: { type: SchemaType.STRING, description: 'ボタンスタイル（丸み、色、サイズ）' },
+        placement: { type: SchemaType.STRING, description: 'CTAの配置パターン' },
+      },
+    },
+    special_features: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: '特徴的なデザイン要素',
+    },
+  },
+  required: ['design_style', 'sections'],
+}
+
+export interface ImageAnalysisResult {
+  design_style: {
+    overall_tone: string
+    main_color: string
+    accent_color?: string
+    font_style?: string
+  }
+  sections: Array<{
+    type: string
+    layout?: string
+    description: string
+  }>
+  cta_style?: {
+    button_style?: string
+    placement?: string
+  }
+  special_features?: string[]
+}
+
+export async function analyzeImageForLP(imageBase64: string, mimeType: string): Promise<ImageAnalysisResult | null> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    return null
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const model = genAI.getGenerativeModel({
+    model: MODEL_TEXT,
+    systemInstruction: IMAGE_ANALYSIS_PROMPT,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: IMAGE_ANALYSIS_SCHEMA,
+      temperature: 0.5,
+    },
+  })
+
+  try {
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: mimeType,
+          data: imageBase64,
+        },
+      },
+      'この画像のLP/Webサイトのデザイン構成を分析してください。',
+    ])
+
+    const text = result.response.text()
+    return JSON.parse(text) as ImageAnalysisResult
+  } catch (error) {
+    console.error('Image analysis error:', error)
+    return null
+  }
+}
+
+// 画像分析結果を元にLP生成（画像からの生成）
+export async function generateLPFromImage(
+  imageAnalysis: ImageAnalysisResult,
+  input: LPGenerationInput
+): Promise<LPBlock[]> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    return generateDefaultTemplate(input)
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey)
+
+  try {
+    // Phase 1: Deep Research（画像分析結果も考慮）
+    const researchResult = await runDeepResearch(genAI, input)
+
+    // Phase 2: LP Blueprint（画像分析結果を反映）
+    const blueprintResult = await runLPBlueprintWithDesign(genAI, researchResult, input, imageAnalysis)
+
+    // Phase 3: LP Builder（デザインスタイルを反映）
+    const blocks = await runLPBuilderWithDesign(genAI, blueprintResult, researchResult, input, imageAnalysis)
+
+    return blocks
+  } catch (error) {
+    console.error('LP generation from image error:', error)
+    return generateDefaultTemplate(input)
+  }
+}
+
+async function runLPBlueprintWithDesign(
+  genAI: GoogleGenerativeAI,
+  research: DeepResearchOutput,
+  input: LPGenerationInput,
+  imageAnalysis: ImageAnalysisResult
+): Promise<LPBlueprint> {
+  const model = genAI.getGenerativeModel({
+    model: MODEL_TEXT,
+    systemInstruction: LP_BLUEPRINT_PROMPT + `
+
+## 参考デザインの特徴
+- 全体トーン: ${imageAnalysis.design_style.overall_tone}
+- メインカラー: ${imageAnalysis.design_style.main_color}
+- セクション構成: ${imageAnalysis.sections.map(s => s.type).join(' → ')}
+${imageAnalysis.special_features ? `- 特徴的要素: ${imageAnalysis.special_features.join(', ')}` : ''}
+
+この参考デザインの雰囲気を取り入れた構成にしてください。`,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: LP_BLUEPRINT_SCHEMA,
+      temperature: 0.5,
+    },
+  })
+
+  const prompt = `# 深掘り分析結果
+${JSON.stringify(research, null, 2)}
+
+# 商品情報
+商品名: ${input.product_name}
+価格: ${input.price || '未定'}
+
+# 参考デザインのセクション構成
+${imageAnalysis.sections.map((s, i) => `${i + 1}. ${s.type}: ${s.description}`).join('\n')}
+
+参考デザインの構成と雰囲気を活かしたLP設計図を作成してください。`
+
+  const result = await model.generateContent(prompt)
+  const text = result.response.text()
+  return JSON.parse(text) as LPBlueprint
+}
+
+async function runLPBuilderWithDesign(
+  genAI: GoogleGenerativeAI,
+  blueprint: LPBlueprint,
+  research: DeepResearchOutput,
+  input: LPGenerationInput,
+  imageAnalysis: ImageAnalysisResult
+): Promise<LPBlock[]> {
+  const model = genAI.getGenerativeModel({
+    model: MODEL_TEXT,
+    systemInstruction: LP_BUILDER_PROMPT + `
+
+## 参考デザインのスタイルガイド
+- 全体トーン: ${imageAnalysis.design_style.overall_tone}
+- メインカラー: ${imageAnalysis.design_style.main_color}
+- アクセントカラー: ${imageAnalysis.design_style.accent_color || '自動'}
+- フォントスタイル: ${imageAnalysis.design_style.font_style || '標準'}
+${imageAnalysis.cta_style ? `- CTAスタイル: ${imageAnalysis.cta_style.button_style || '標準'}` : ''}
+
+このスタイルに合わせたLPを生成してください。`,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: LP_BLOCKS_SCHEMA,
+      temperature: 0.6,
+    },
+  })
+
+  const prompt = `# LP設計図
+${JSON.stringify(blueprint, null, 2)}
+
+# ターゲットペルソナ
+${JSON.stringify(research.target_persona, null, 2)}
+
+# 推奨トーン
+${research.recommended_tone}
+
+# 参考デザインの特徴
+${imageAnalysis.special_features ? imageAnalysis.special_features.join('\n') : 'なし'}
+
+# 商品情報
+商品名: ${input.product_name}
+価格: ${input.price || '無料'}
+${input.testimonials?.length ? `お客様の声: ${JSON.stringify(input.testimonials)}` : ''}
+
+参考デザインの雰囲気を反映したLPを生成してください。`
+
+  const result = await model.generateContent(prompt)
+  const text = result.response.text()
+  const parsed = JSON.parse(text)
+
+  return parsed.blocks.map((block: Record<string, unknown>) => ({
+    id: typeof block.id === 'string' && block.id.length > 0 ? block.id : crypto.randomUUID(),
+    type: block.type as BlockType,
+    content: block.content || {},
+    settings: {
+      ...(block.settings as Record<string, unknown> || { padding: 'medium', width: 'medium' }),
+      // 参考デザインのカラーを適用
+      background_color: imageAnalysis.design_style.main_color,
+    },
+  }))
+}
+
 // コピペ用テンプレート
 export const LP_GENERATION_PROMPT_TEMPLATE = `以下の情報を入力してください：
 
