@@ -77,8 +77,11 @@ export default function SettingsPage() {
       if (authUser) {
         const { error } = await supabase
           .from("users")
-          .update({ settings })
-          .eq("id", authUser.id);
+          .upsert({
+            id: authUser.id,
+            email: authUser.email,
+            settings
+          }, { onConflict: "id" });
 
         if (error) throw error;
 
