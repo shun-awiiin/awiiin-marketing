@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowLeft, Edit, Trash2, Send, ExternalLink, AlertCircle, CheckCircle2, Clock } from "lucide-react"
-import { formatDistanceToNow, format } from "date-fns"
+import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { PostActions } from "./post-actions"
+import { ClientDate } from "@/components/ui/client-date"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -92,7 +93,7 @@ export default async function PostDetailPage({ params }: PageProps) {
               {config?.label || post.status}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              作成: {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ja })}
+              作成: <ClientDate date={post.created_at} format="relative" />
             </span>
           </div>
         </div>
@@ -121,11 +122,9 @@ export default async function PostDetailPage({ params }: PageProps) {
               <span>
                 {format(new Date(post.scheduled_at), "PPP HH:mm", { locale: ja })}
               </span>
-              {new Date(post.scheduled_at) > new Date() && (
-                <span className="text-muted-foreground">
-                  ({formatDistanceToNow(new Date(post.scheduled_at), { addSuffix: true, locale: ja })})
-                </span>
-              )}
+              <span className="text-muted-foreground">
+                (<ClientDate date={post.scheduled_at} format="relative" />)
+              </span>
             </div>
           </CardContent>
         </Card>

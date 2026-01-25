@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { TestSendDialog } from "./test-send-dialog";
 import { RealtimeStats } from "./realtime-stats";
+import { ClientDate } from "@/components/ui/client-date";
 
 interface Campaign {
   id: string;
@@ -58,6 +59,7 @@ interface Message {
   status: string;
   sent_at: string | null;
   created_at: string;
+  to_email: string;
   contacts: {
     email: string;
     name: string | null;
@@ -97,6 +99,47 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
     setLoading(false);
   };
 
+  // 送信プロセスを開始
+  const handleStartSending = async () => {
+    setLoading(true);
+    try {
+      // まずステータスをsendingに更新
+      const { error: statusError } = await supabase
+        .from("campaigns")
+        .update({ status: "sending" })
+        .eq("id", campaign.id);
+
+      if (statusError) {
+        alert(`ステータス更新エラー: ${statusError.message}`);
+        setLoading(false);
+        return;
+      }
+
+      setCurrentStatus("sending");
+
+      // 送信プロセスを呼び出し（同期的に待つ）
+      const response = await fetch("/api/campaigns/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId: campaign.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(`送信エラー: ${errorData.error || "送信に失敗しました"}`);
+      } else {
+        const result = await response.json();
+        alert(`送信完了: ${result.sent}件送信、${result.failed}件失敗`);
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Send error:", error);
+      alert("送信処理中にエラーが発生しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<
       string,
@@ -110,6 +153,11 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
       scheduled: {
         label: "予約済み",
         className: "bg-blue-100 text-blue-700",
+        icon: Clock,
+      },
+      queued: {
+        label: "キュー待ち",
+        className: "bg-purple-100 text-purple-700",
         icon: Clock,
       },
       sending: {
@@ -126,6 +174,11 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
         label: "一時停止",
         className: "bg-orange-100 text-orange-700",
         icon: Pause,
+      },
+      stopped: {
+        label: "停止",
+        className: "bg-red-100 text-red-700",
+        icon: XCircle,
       },
     };
     const config = statusConfig[status] || statusConfig.draft;
@@ -168,21 +221,21 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
             {getStatusBadge(currentStatus)}
           </div>
           <p className="text-muted-foreground">
-            作成日: {new Date(campaign.created_at).toLocaleDateString("ja-JP")}
+            作成日: <ClientDate date={campaign.created_at} />
           </p>
         </div>
         <div className="flex gap-2">
-          {["draft", "scheduled", "paused"].includes(currentStatus) && (
+          {["draft", "scheduled", "paused", "queued"].includes(currentStatus) && (
             <TestSendDialog
               campaignId={campaign.id}
               campaignName={campaign.name}
               disabled={loading}
             />
           )}
-          {currentStatus === "draft" && (
-            <Button onClick={() => handleStatusChange("sending")} disabled={loading}>
+          {["draft", "queued"].includes(currentStatus) && (
+            <Button onClick={handleStartSending} disabled={loading}>
               <Send className="mr-2 h-4 w-4" />
-              送信開始
+              {loading ? "送信中..." : "送信開始"}
             </Button>
           )}
           {currentStatus === "sending" && (
@@ -251,12 +304,14 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>{message.contacts?.email}</TableCell>
+                        <TableCell>{message.contacts?.email || message.to_email}</TableCell>
                         <TableCell>{message.contacts?.name || "-"}</TableCell>
                         <TableCell>
-                          {message.sent_at
-                            ? new Date(message.sent_at).toLocaleString("ja-JP")
-                            : "-"}
+                          {message.sent_at ? (
+                            <ClientDate date={message.sent_at} format="datetime" />
+                          ) : (
+                            "-"
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

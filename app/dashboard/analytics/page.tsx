@@ -22,6 +22,8 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { ClientDate } from "@/components/ui/client-date";
+import { ClientNumber } from "@/components/ui/client-number";
 
 async function getAnalytics(userId: string) {
   const supabase = await createClient();
@@ -121,7 +123,9 @@ export default async function AnalyticsPage() {
             <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              <ClientNumber value={stats.total} />
+            </div>
           </CardContent>
         </Card>
 
@@ -132,7 +136,7 @@ export default async function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {stats.sent.toLocaleString()}
+              <ClientNumber value={stats.sent} />
             </div>
           </CardContent>
         </Card>
@@ -243,7 +247,7 @@ export default async function AnalyticsPage() {
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(event.created_at).toLocaleDateString("ja-JP")}
+                      <ClientDate date={event.created_at} />
                     </span>
                   </div>
                 ))

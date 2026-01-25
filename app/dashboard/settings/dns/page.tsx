@@ -20,6 +20,7 @@ import {
   Info,
   Globe,
 } from "lucide-react";
+import { ClientDate } from "@/components/ui/client-date";
 
 interface SavedDomain {
   id: string;
@@ -163,7 +164,7 @@ export default function DnsSettingsPage() {
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(saved.last_checked_at).toLocaleDateString("ja-JP")}
+                    <ClientDate date={saved.last_checked_at} />
                   </span>
                 </button>
               ))}

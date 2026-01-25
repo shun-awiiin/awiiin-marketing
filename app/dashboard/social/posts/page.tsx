@@ -7,8 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, ArrowLeft, Calendar, Send, FileText, AlertCircle, CheckCircle2 } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
-import { ja } from "date-fns/locale"
+import { ClientDate } from "@/components/ui/client-date"
 
 export const metadata = {
   title: "投稿一覧 | SNS投稿",
@@ -105,10 +104,7 @@ async function PostsList({ userId }: { userId: string }) {
                       </Badge>
                       {post.scheduled_at && post.status === "scheduled" && (
                         <span className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(post.scheduled_at), {
-                            addSuffix: true,
-                            locale: ja,
-                          })}
+                          <ClientDate date={post.scheduled_at} format="relative" />
                         </span>
                       )}
                     </div>
@@ -131,10 +127,7 @@ async function PostsList({ userId }: { userId: string }) {
                         </Badge>
                       ))}
                       <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(post.created_at), {
-                          addSuffix: true,
-                          locale: ja,
-                        })}
+                        <ClientDate date={post.created_at} format="relative" />
                       </span>
                     </div>
                   </div>

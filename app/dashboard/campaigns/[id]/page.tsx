@@ -56,7 +56,11 @@ export default async function CampaignDetailPage({
       .from("messages")
       .select(
         `
-        *,
+        id,
+        status,
+        sent_at,
+        created_at,
+        to_email,
         contacts(email, name)
       `
       )
@@ -68,7 +72,7 @@ export default async function CampaignDetailPage({
 
   const stats = {
     total: statsResult.data?.length ?? 0,
-    pending: statsResult.data?.filter((m) => m.status === "pending").length ?? 0,
+    pending: statsResult.data?.filter((m) => ["pending", "queued"].includes(m.status)).length ?? 0,
     sent: statsResult.data?.filter((m) => m.status === "sent").length ?? 0,
     failed: statsResult.data?.filter((m) => m.status === "failed").length ?? 0,
     bounced: statsResult.data?.filter((m) => m.status === "bounced").length ?? 0,

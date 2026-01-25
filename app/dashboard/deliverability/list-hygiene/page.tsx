@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { ClientNumber } from "@/components/ui/client-number";
 
 interface ListHygieneStatus {
   total_contacts: number;
@@ -182,7 +183,7 @@ export default function ListHygienePage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm text-muted-foreground mb-2">
-                      {status.active_contacts.toLocaleString()}件のアクティブコンタクト
+                      <ClientNumber value={status.active_contacts} />件のアクティブコンタクト
                     </p>
                     <Progress value={status.health_percentage} className="h-2" />
                   </div>
@@ -199,7 +200,7 @@ export default function ListHygienePage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 bg-green-50 rounded text-center">
                     <p className="text-xl font-bold text-green-700">
-                      {status.active_contacts.toLocaleString()}
+                      <ClientNumber value={status.active_contacts} />
                     </p>
                     <p className="text-xs text-muted-foreground">アクティブ</p>
                   </div>

@@ -100,11 +100,11 @@ export function useRealtimeStats(
 
       const statsData = data?.[0] || defaultStats;
 
-      setStats({
+      setStats((prev) => ({
         ...statsData,
-        last_updated: new Date(),
+        last_updated: prev?.last_updated ?? null,
         is_connected: isConnected,
-      });
+      }));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch stats'));

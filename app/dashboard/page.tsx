@@ -19,6 +19,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { calculateDeliverabilityScore } from "@/lib/deliverability/deliverability-score";
+import { ClientDate } from "@/components/ui/client-date";
+import { ClientNumber } from "@/components/ui/client-number";
 
 async function getStats(userId: string) {
   const supabase = await createClient();
@@ -301,9 +303,11 @@ export default async function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeContacts.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              <ClientNumber value={stats.activeContacts} />
+            </div>
             <p className="text-xs text-muted-foreground">
-              有効 / {stats.contacts.toLocaleString()}件中
+              有効 / <ClientNumber value={stats.contacts} />件中
             </p>
           </CardContent>
         </Card>
@@ -314,7 +318,9 @@ export default async function DashboardPage() {
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.todaySent.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              <ClientNumber value={stats.todaySent} />
+            </div>
             <p className="text-xs text-muted-foreground">
               {stats.activeCampaigns > 0 ? `${stats.activeCampaigns}件進行中` : "進行中なし"}
             </p>
@@ -329,7 +335,7 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.deliveryRate}%</div>
             <p className="text-xs text-muted-foreground">
-              {stats.weekDelivered.toLocaleString()} / {stats.weekSent.toLocaleString()}件
+              <ClientNumber value={stats.weekDelivered} /> / <ClientNumber value={stats.weekSent} />件
             </p>
           </CardContent>
         </Card>
@@ -390,7 +396,7 @@ export default async function DashboardPage() {
                     <div className="flex flex-col">
                       <span className="font-medium">{campaign.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(campaign.created_at).toLocaleDateString("ja-JP")}
+                        <ClientDate date={campaign.created_at} />
                       </span>
                     </div>
                     <StatusBadge status={campaign.status} />

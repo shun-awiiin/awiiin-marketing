@@ -40,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { Shield, Users, AlertCircle, CheckCircle } from "lucide-react";
 import { UserRole } from "@/lib/types/database";
 import { useCurrentUser, hasRole } from "@/lib/hooks/use-current-user";
+import { ClientDate } from "@/components/ui/client-date";
 
 interface UserRecord {
   id: string;
@@ -238,7 +239,7 @@ export default function UsersSettingsPage() {
                     </TableCell>
                     <TableCell>{user.display_name || "-"}</TableCell>
                     <TableCell>
-                      {new Date(user.created_at).toLocaleDateString("ja-JP")}
+                      <ClientDate date={user.created_at} />
                     </TableCell>
                     <TableCell>
                       <Select
