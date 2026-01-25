@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Pencil, RotateCcw, GripVertical, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Pencil, RotateCcw, GripVertical, ChevronUp, ChevronDown, Trash2, 
+  Plus, Code, Wand2, Save, X, Eye, EyeOff 
+} from "lucide-react";
 
 interface LPSection {
   id: string;
@@ -31,7 +35,20 @@ interface LPPreviewProps {
   onSectionRegenerate?: (sectionType: string) => void;
   onSectionsReorder?: (sections: LPSection[]) => void;
   onSectionDelete?: (sectionId: string) => void;
+  onSectionHTMLUpdate?: (section: LPSection) => void;
+  onSectionAdd?: (sectionType: string, position: number) => void;
 }
+
+const availableSectionTypes = [
+  { type: "hero", label: "ヒーロー" },
+  { type: "problem", label: "問題提起" },
+  { type: "empathy", label: "共感" },
+  { type: "solution", label: "解決策" },
+  { type: "features", label: "特徴" },
+  { type: "testimonials", label: "お客様の声" },
+  { type: "faq", label: "FAQ" },
+  { type: "cta", label: "CTA" },
+];
 
 const paddingClasses = {
   small: "py-8",
@@ -63,6 +80,8 @@ export function LPPreview({
   onSectionRegenerate,
   onSectionsReorder,
   onSectionDelete,
+  onSectionHTMLUpdate,
+  onSectionAdd,
 }: LPPreviewProps) {
   const typedBlocks = blocks as LPBlock[];
 
@@ -85,6 +104,8 @@ export function LPPreview({
         onSectionRegenerate={onSectionRegenerate}
         onSectionsReorder={onSectionsReorder}
         onSectionDelete={onSectionDelete}
+        onSectionHTMLUpdate={onSectionHTMLUpdate}
+        onSectionAdd={onSectionAdd}
       />
     );
   }
@@ -106,6 +127,8 @@ function SectionBasedPreview({
   onSectionRegenerate,
   onSectionsReorder,
   onSectionDelete,
+  onSectionHTMLUpdate,
+  onSectionAdd,
 }: { 
   block: LPBlock;
   editable?: boolean;
@@ -113,6 +136,8 @@ function SectionBasedPreview({
   onSectionRegenerate?: (sectionType: string) => void;
   onSectionsReorder?: (sections: LPSection[]) => void;
   onSectionDelete?: (sectionId: string) => void;
+  onSectionHTMLUpdate?: (section: LPSection) => void;
+  onSectionAdd?: (sectionType: string, position: number) => void;
 }) {
   const content = block.content as { 
     sections?: LPSection[]; 
@@ -129,7 +154,11 @@ function SectionBasedPreview({
 
   const [sections, setSections] = useState<LPSection[]>(content.sections || []);
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<"ai" | "html">("ai");
   const [editInstruction, setEditInstruction] = useState("");
+  const [editHtml, setEditHtml] = useState("");
+  const [showAddSection, setShowAddSection] = useState<number | null>(null);
+  const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
   useEffect(() => {
     setSections(content.sections || []);
@@ -154,10 +183,56 @@ function SectionBasedPreview({
     }
   };
 
+  const handleHTMLSave = (section: LPSection) => {
+    const updatedSection = { ...section, html: editHtml };
+    onSectionHTMLUpdate?.(updatedSection);
+    
+    // ローカルステートも更新
+    setSections(prev => prev.map(s => s.id === section.id ? updatedSection : s));
+    setEditingSection(null);
+    setEditHtml("");
+  };
+
+  const handleStartEdit = (section: LPSection) => {
+    if (editingSection === section.id) {
+      setEditingSection(null);
+      setEditHtml("");
+      setEditInstruction("");
+    } else {
+      setEditingSection(section.id);
+      setEditHtml(section.html);
+      setEditInstruction("");
+      setEditMode("ai");
+    }
+  };
+
+  const handleAddSection = (sectionType: string, position: number) => {
+    onSectionAdd?.(sectionType, position);
+    setShowAddSection(null);
+  };
+
   if (!sections.length) {
     return (
-      <div className="flex items-center justify-center h-96 text-muted-foreground">
-        セクションがありません
+      <div className="space-y-4">
+        <div className="flex items-center justify-center h-96 text-muted-foreground border rounded-lg bg-muted/50">
+          セクションがありません
+        </div>
+        {editable && (
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => setShowAddSection(0)}
+          >
+            <Plus className="size-4 mr-2" />
+            セクションを追加
+          </Button>
+        )}
+        {showAddSection === 0 && (
+          <AddSectionMenu 
+            onSelect={(type) => handleAddSection(type, 0)}
+            onCancel={() => setShowAddSection(null)}
+          />
+        )}
       </div>
     );
   }
@@ -180,107 +255,236 @@ function SectionBasedPreview({
   return (
     <div className="space-y-4">
       {/* プレビュー */}
-      <div className="bg-white rounded-lg overflow-hidden border">
-        <IframePreview html={fullHtml} />
+      <div className="border rounded-lg overflow-hidden">
+        <div 
+          className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b cursor-pointer"
+          onClick={() => setPreviewCollapsed(!previewCollapsed)}
+        >
+          <span className="text-sm font-medium">プレビュー</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6">
+            {previewCollapsed ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+          </Button>
+        </div>
+        {!previewCollapsed && (
+          <div className="bg-white">
+            <IframePreview html={fullHtml} />
+          </div>
+        )}
       </div>
 
       {/* 編集モード時のセクションリスト */}
       {editable && (
         <div className="space-y-2">
-          <h3 className="font-medium text-sm text-muted-foreground">セクション編集</h3>
-          {sections.sort((a, b) => a.order - b.order).map((section, index) => (
-            <div 
-              key={section.id} 
-              className="border rounded-lg p-3 bg-card"
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm text-muted-foreground">セクション編集</h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowAddSection(sections.length)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <GripVertical className="size-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {sectionTypeLabels[section.type] || section.type}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleMoveSection(index, "up")}
-                    disabled={index === 0}
-                  >
-                    <ChevronUp className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleMoveSection(index, "down")}
-                    disabled={index === sections.length - 1}
-                  >
-                    <ChevronDown className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setEditingSection(editingSection === section.id ? null : section.id)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onSectionRegenerate?.(section.type)}
-                  >
-                    <RotateCcw className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => onSectionDelete?.(section.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </div>
+              <Plus className="size-4 mr-1" />
+              追加
+            </Button>
+          </div>
 
-              {/* 編集フォーム */}
-              {editingSection === section.id && (
-                <div className="mt-3 space-y-2">
-                  <textarea
-                    className="w-full p-2 border rounded text-sm"
-                    rows={2}
-                    placeholder="編集指示を入力（例：見出しをもっとインパクトのあるものに変更）"
-                    value={editInstruction}
-                    onChange={(e) => setEditInstruction(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleEditSubmit(section)}
-                      disabled={!editInstruction.trim()}
+          {sections.sort((a, b) => a.order - b.order).map((section, index) => (
+            <div key={section.id}>
+              {/* セクション追加ボタン（各セクションの上） */}
+              {showAddSection === index && (
+                <AddSectionMenu 
+                  onSelect={(type) => handleAddSection(type, index)}
+                  onCancel={() => setShowAddSection(null)}
+                />
+              )}
+
+              <div className="border rounded-lg bg-card overflow-hidden">
+                {/* ヘッダー */}
+                <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <GripVertical className="size-4 text-muted-foreground cursor-grab" />
+                    <span className="font-medium text-sm">
+                      {sectionTypeLabels[section.type] || section.type}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      #{index + 1}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleMoveSection(index, "up")}
+                      disabled={index === 0}
+                      title="上に移動"
                     >
-                      編集を適用
+                      <ChevronUp className="size-4" />
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        setEditingSection(null);
-                        setEditInstruction("");
-                      }}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleMoveSection(index, "down")}
+                      disabled={index === sections.length - 1}
+                      title="下に移動"
                     >
-                      キャンセル
+                      <ChevronDown className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleStartEdit(section)}
+                      title="編集"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onSectionRegenerate?.(section.type)}
+                      title="AI再生成"
+                    >
+                      <RotateCcw className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setShowAddSection(index)}
+                      title="この上に追加"
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => onSectionDelete?.(section.id)}
+                      title="削除"
+                    >
+                      <Trash2 className="size-4" />
                     </Button>
                   </div>
                 </div>
-              )}
+
+                {/* 編集エリア */}
+                {editingSection === section.id && (
+                  <div className="p-3 space-y-3 bg-muted/10">
+                    <Tabs value={editMode} onValueChange={(v) => setEditMode(v as "ai" | "html")}>
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="ai" className="text-xs">
+                          <Wand2 className="size-3 mr-1" />
+                          AI編集
+                        </TabsTrigger>
+                        <TabsTrigger value="html" className="text-xs">
+                          <Code className="size-3 mr-1" />
+                          HTML編集
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="ai" className="space-y-2 mt-3">
+                        <textarea
+                          className="w-full p-2 border rounded text-sm font-sans"
+                          rows={3}
+                          placeholder="編集指示を入力&#10;例：見出しをもっとインパクトのあるものに変更&#10;例：背景色を青に変更&#10;例：ボタンのテキストを「今すぐ申し込む」に"
+                          value={editInstruction}
+                          onChange={(e) => setEditInstruction(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleEditSubmit(section)}
+                            disabled={!editInstruction.trim()}
+                          >
+                            <Wand2 className="size-3 mr-1" />
+                            AIで編集
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleStartEdit(section)}
+                          >
+                            キャンセル
+                          </Button>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="html" className="space-y-2 mt-3">
+                        <textarea
+                          className="w-full p-2 border rounded text-xs font-mono bg-slate-900 text-slate-100"
+                          rows={12}
+                          value={editHtml}
+                          onChange={(e) => setEditHtml(e.target.value)}
+                          spellCheck={false}
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleHTMLSave(section)}
+                          >
+                            <Save className="size-3 mr-1" />
+                            保存
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleStartEdit(section)}
+                          >
+                            キャンセル
+                          </Button>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
+
+          {/* 最後にセクション追加 */}
+          {showAddSection === sections.length && (
+            <AddSectionMenu 
+              onSelect={(type) => handleAddSection(type, sections.length)}
+              onCancel={() => setShowAddSection(null)}
+            />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// セクション追加メニュー
+function AddSectionMenu({ 
+  onSelect, 
+  onCancel 
+}: { 
+  onSelect: (type: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="border rounded-lg p-3 bg-card mb-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium">セクションを追加</span>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onCancel}>
+          <X className="size-4" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {availableSectionTypes.map((st) => (
+          <Button
+            key={st.type}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onSelect(st.type)}
+          >
+            {st.label}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
