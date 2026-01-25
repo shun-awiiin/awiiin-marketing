@@ -27,7 +27,7 @@ import { useCurrentUser, hasRole } from "@/lib/hooks/use-current-user";
 export default function SettingsPage() {
   const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [settings, setSettings] = useState({
-    emailProvider: "mock",
+    emailProvider: "ses",
     sendFromEmail: "",
     sendFromName: "",
     dailyLimit: "500",
@@ -203,12 +203,13 @@ export default function SettingsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mock">開発モード（送信しない）</SelectItem>
+                <SelectItem value="ses">Amazon SES</SelectItem>
                 <SelectItem value="resend">Resend</SelectItem>
                 <SelectItem value="sendgrid">SendGrid</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              実際にメールを送信するには、プロバイダーのAPIキーを環境変数に設定してください
+              プロバイダーは環境変数で設定されます。この設定は表示用です。
             </p>
           </div>
           <div className="flex flex-col gap-2">
