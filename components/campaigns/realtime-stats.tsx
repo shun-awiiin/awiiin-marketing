@@ -155,7 +155,7 @@ export function RealtimeStats({
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <RefreshCw className="h-3 w-3" />
-          最終更新: {stats.last_updated.toLocaleTimeString("ja-JP")}
+          最終更新: {stats.last_updated ? stats.last_updated.toLocaleTimeString("ja-JP") : "-"}
         </div>
       </div>
 
