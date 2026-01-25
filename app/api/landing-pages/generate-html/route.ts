@@ -5,6 +5,7 @@ import {
   analyzeReferenceImage,
   editSection,
   generateSection,
+  generateAdvancedLP,
   type LPSection,
   type LPGenerationInput,
 } from '@/lib/lp/html-generator'
@@ -29,6 +30,12 @@ const generateSchema = z.object({
   // 参考画像（Base64）
   referenceImage: z.string().optional(),
   referenceImageMimeType: z.string().optional(),
+  // 4段階高品質生成モード
+  advancedMode: z.boolean().optional(),
+  // 追加フィールド
+  brand_keywords: z.array(z.string()).optional(),
+  key_features: z.array(z.string()).optional(),
+  desired_action: z.string().optional(),
 })
 
 // セクション編集スキーマ
@@ -136,8 +143,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // セクションベースでLP生成
-    const result = await generateLPHTML(validation.data, imageAnalysis)
+    // LP生成（通常モード or 4段階高品質モード）
+    let result
+    let deepAnalysis = null
+    let designConcept = null
+
+    if (validation.data.advancedMode) {
+      // 4段階高品質LP生成
+      const advancedResult = await generateAdvancedLP(
+        validation.data as LPGenerationInput,
+        imageAnalysis
+      )
+      result = advancedResult
+      deepAnalysis = advancedResult.deepAnalysis || null
+      designConcept = advancedResult.designConcept || null
+    } else {
+      // 通常のセクションベースLP生成
+      result = await generateLPHTML(validation.data, imageAnalysis)
+    }
 
     // 生成履歴を保存
     await supabase.from('lp_generation_history').insert({
@@ -158,6 +181,8 @@ export async function POST(request: NextRequest) {
         title: result.title,
         meta_description: result.meta_description,
         imageAnalysis,
+        deepAnalysis,
+        designConcept,
       },
     })
   } catch (error) {

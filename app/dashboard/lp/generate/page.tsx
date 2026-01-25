@@ -18,14 +18,15 @@ interface Testimonial {
   quote: string;
 }
 
-type GenerationPhase = "idle" | "analyzing" | "researching" | "planning" | "building" | "complete";
+type GenerationPhase = "idle" | "analyzing" | "deep_analysis" | "design_concept" | "building" | "critique" | "complete";
 
 const phaseLabels: Record<GenerationPhase, { label: string; description: string; progress: number }> = {
   idle: { label: "", description: "", progress: 0 },
-  analyzing: { label: "画像分析中", description: "参考デザインの構成を解析しています...", progress: 15 },
-  researching: { label: "深掘り分析中", description: "AIがターゲットと課題を深掘りしています...", progress: 35 },
-  planning: { label: "設計中", description: "LP構成を設計しています...", progress: 55 },
-  building: { label: "生成中", description: "高コンバージョンなLPを生成しています...", progress: 80 },
+  analyzing: { label: "画像分析中", description: "参考デザインの構成を解析しています...", progress: 10 },
+  deep_analysis: { label: "深層分析中", description: "心理学者・戦略家・行動経済学者が顧客を分析中...", progress: 25 },
+  design_concept: { label: "デザイン設計中", description: "Apple/Airbnb出身デザイナーがコンセプトを策定中...", progress: 45 },
+  building: { label: "LP生成中", description: "高コンバージョンなLPを生成しています...", progress: 70 },
+  critique: { label: "品質チェック中", description: "厳格なクリティックがLPを批評・改善中...", progress: 90 },
   complete: { label: "完了", description: "LPが完成しました！", progress: 100 },
 };
 
@@ -46,6 +47,9 @@ export default function GenerateLPPage() {
   });
   const [bonuses, setBonuses] = useState<string[]>([""]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [advancedMode, setAdvancedMode] = useState(true); // デフォルトで高品質モード
+  const [brandKeywords, setBrandKeywords] = useState<string[]>([""]); // ブランドキーワード
+  const [keyFeatures, setKeyFeatures] = useState<string[]>([""]); // 主要特徴
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,25 +167,40 @@ export default function GenerateLPPage() {
         ...formData,
         bonuses: bonuses.filter((b) => b.trim() !== ""),
         testimonials: testimonials.filter((t) => t.name.trim() !== "" && t.quote.trim() !== ""),
+        advancedMode,
+        brand_keywords: brandKeywords.filter((k) => k.trim() !== ""),
+        key_features: keyFeatures.filter((f) => f.trim() !== ""),
       };
 
-      // 参考画像がある場合は画像分析から開始
-      if (referenceImage && referenceImageFile) {
-        setPhase("analyzing");
-        const base64Data = referenceImage.split(",")[1];
-        payload.referenceImage = base64Data;
-        payload.referenceImageMimeType = "image/jpeg";
-
-        setTimeout(() => setPhase("researching"), 2000);
-        setTimeout(() => setPhase("planning"), 5000);
-        setTimeout(() => setPhase("building"), 8000);
+      // 4段階高品質モードのフェーズ進行
+      if (advancedMode) {
+        // 参考画像がある場合は画像分析から開始
+        if (referenceImage && referenceImageFile) {
+          setPhase("analyzing");
+          const base64Data = referenceImage.split(",")[1];
+          payload.referenceImage = base64Data;
+          payload.referenceImageMimeType = "image/jpeg";
+          setTimeout(() => setPhase("deep_analysis"), 3000);
+        } else {
+          setPhase("deep_analysis");
+        }
+        setTimeout(() => setPhase("design_concept"), referenceImage ? 8000 : 5000);
+        setTimeout(() => setPhase("building"), referenceImage ? 15000 : 12000);
+        setTimeout(() => setPhase("critique"), referenceImage ? 25000 : 22000);
       } else {
-        setPhase("researching");
-        setTimeout(() => setPhase("planning"), 3000);
-        setTimeout(() => setPhase("building"), 6000);
+        // 通常モードのフェーズ進行
+        if (referenceImage && referenceImageFile) {
+          setPhase("analyzing");
+          const base64Data = referenceImage.split(",")[1];
+          payload.referenceImage = base64Data;
+          payload.referenceImageMimeType = "image/jpeg";
+          setTimeout(() => setPhase("building"), 3000);
+        } else {
+          setPhase("building");
+        }
       }
 
-      // 新しいHTML生成APIを使用
+      // HTML生成APIを使用
       const response = await fetch("/api/landing-pages/generate-html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -316,6 +335,137 @@ export default function GenerateLPPage() {
                   </label>
                 )}
               </CardContent>
+            </Card>
+
+            {/* 高品質モード設定 */}
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="size-5 text-primary" />
+                    4段階高品質モード
+                  </CardTitle>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm text-muted-foreground">
+                      {advancedMode ? "ON" : "OFF"}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={advancedMode}
+                      onChange={(e) => setAdvancedMode(e.target.checked)}
+                      className="w-10 h-5 rounded-full appearance-none bg-muted checked:bg-primary transition-colors cursor-pointer relative before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 checked:before:translate-x-5 before:transition-transform before:shadow"
+                      disabled={isGenerating}
+                    />
+                  </label>
+                </div>
+                <CardDescription>
+                  心理学者・デザイナー・行動経済学者のAIペルソナが順番に分析・設計し、
+                  最後に厳格なクリティックが批評・改善を行います
+                </CardDescription>
+              </CardHeader>
+              {advancedMode && (
+                <CardContent className="space-y-4 pt-0">
+                  <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                    <div className="font-medium mb-2">4段階プロセス:</div>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>深層分析 - ターゲットの深層心理を3人の専門家が分析</li>
+                      <li>デザインコンセプト - Apple/Airbnb出身デザイナーが設計</li>
+                      <li>LP構造生成 - 分析結果を反映したLP生成</li>
+                      <li>自己批評 - 厳格なクリティックが批評・改善</li>
+                    </ol>
+                  </div>
+                  
+                  {/* ブランドキーワード */}
+                  <div>
+                    <Label className="text-sm font-medium">ブランドキーワード（任意）</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      ブランドの印象を表すキーワード（例：信頼、革新、温かみ）
+                    </p>
+                    <div className="space-y-2">
+                      {brandKeywords.map((keyword, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={keyword}
+                            onChange={(e) => {
+                              const newKeywords = [...brandKeywords];
+                              newKeywords[index] = e.target.value;
+                              setBrandKeywords(newKeywords);
+                            }}
+                            placeholder={`キーワード ${index + 1}`}
+                            disabled={isGenerating}
+                          />
+                          {brandKeywords.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setBrandKeywords(brandKeywords.filter((_, i) => i !== index))}
+                              disabled={isGenerating}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBrandKeywords([...brandKeywords, ""])}
+                        disabled={isGenerating}
+                      >
+                        <Plus className="size-4 mr-2" />
+                        追加
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 主要特徴 */}
+                  <div>
+                    <Label className="text-sm font-medium">主要特徴（任意）</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      商品/サービスの主な特徴や強み
+                    </p>
+                    <div className="space-y-2">
+                      {keyFeatures.map((feature, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={feature}
+                            onChange={(e) => {
+                              const newFeatures = [...keyFeatures];
+                              newFeatures[index] = e.target.value;
+                              setKeyFeatures(newFeatures);
+                            }}
+                            placeholder={`特徴 ${index + 1}`}
+                            disabled={isGenerating}
+                          />
+                          {keyFeatures.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setKeyFeatures(keyFeatures.filter((_, i) => i !== index))}
+                              disabled={isGenerating}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setKeyFeatures([...keyFeatures, ""])}
+                        disabled={isGenerating}
+                      >
+                        <Plus className="size-4 mr-2" />
+                        追加
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
             </Card>
 
             {/* 基本情報 */}
