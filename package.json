@@ -15,6 +15,7 @@
     "sst:remove": "sst remove"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@aws-sdk/client-ses": "^3.975.0",
     "@aws-sdk/client-sqs": "^3.975.0",
     "@hookform/resolvers": "^3.10.0",
