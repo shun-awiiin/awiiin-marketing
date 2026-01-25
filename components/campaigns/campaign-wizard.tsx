@@ -38,6 +38,8 @@ import {
   Eye,
   Sparkles,
   Mail,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import {
   TemplateType,
@@ -98,8 +100,9 @@ export function CampaignWizard({
     type: "" as TemplateType | "",
     templateId: "",
     subjectIndex: 0,
-    audienceType: "all" as "all" | "tags",
+    audienceType: "all" as "all" | "tags" | "specific",
     selectedTags: [] as string[],
+    specificEmails: "" as string, // comma or newline separated
     scheduleType: "now" as "now" | "later",
     scheduledAt: "",
     // Seminar invite fields
@@ -117,6 +120,9 @@ export function CampaignWizard({
   const [loading, setLoading] = useState(false);
   const [audienceCount, setAudienceCount] = useState(totalActiveContacts);
   const [showPreview, setShowPreview] = useState(false);
+  const [testSending, setTestSending] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [userSettings, setUserSettings] = useState<{
     sendFromName: string;
     sendFromEmail: string;
@@ -167,11 +173,18 @@ export function CampaignWizard({
     }
   }, [campaignData.type, filteredTemplates, campaignData.templateId]);
 
-  // Fetch audience count when tags change
+  // Fetch audience count when tags/emails change
   useEffect(() => {
     const fetchAudienceCount = async () => {
       if (campaignData.audienceType === "all") {
         setAudienceCount(totalActiveContacts);
+      } else if (campaignData.audienceType === "specific") {
+        // Count specific emails
+        const emails = campaignData.specificEmails
+          .split(/[,\n]/)
+          .map((e) => e.trim())
+          .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+        setAudienceCount(emails.length);
       } else if (campaignData.selectedTags.length > 0) {
         const { count } = await supabase
           .from("contact_tags")
@@ -183,7 +196,7 @@ export function CampaignWizard({
       }
     };
     fetchAudienceCount();
-  }, [campaignData.audienceType, campaignData.selectedTags, totalActiveContacts, supabase]);
+  }, [campaignData.audienceType, campaignData.selectedTags, campaignData.specificEmails, totalActiveContacts, supabase]);
 
   // Generate preview content
   const preview = useMemo(() => {
@@ -295,6 +308,14 @@ export function CampaignWizard({
     const subjectTemplate = SUBJECT_VARIANTS[campaignData.type][campaignData.subjectIndex];
     const bodyRendered = renderTemplate(selectedTemplate.body_text, context);
 
+    // Parse specific emails if provided
+    const specificEmailsList = campaignData.audienceType === "specific"
+      ? campaignData.specificEmails
+          .split(/[,\n]/)
+          .map((e) => e.trim())
+          .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      : null;
+
     const { data: campaign, error } = await supabase
       .from("campaigns")
       .insert({
@@ -308,6 +329,7 @@ export function CampaignWizard({
         variables: {},
         filter_tags:
           campaignData.audienceType === "tags" ? campaignData.selectedTags : null,
+        specific_emails: specificEmailsList,
         from_name: userSettings.sendFromName,
         from_email: userSettings.sendFromEmail,
         rate_limit_per_minute: 20,
@@ -674,7 +696,7 @@ export function CampaignWizard({
                 <div className="flex flex-col gap-4">
                   <RadioGroup
                     value={campaignData.audienceType}
-                    onValueChange={(value: "all" | "tags") =>
+                    onValueChange={(value: "all" | "tags" | "specific") =>
                       setCampaignData({ ...campaignData, audienceType: value })
                     }
                     className="flex flex-col gap-3"
@@ -719,6 +741,26 @@ export function CampaignWizard({
                         </p>
                       </div>
                     </div>
+                    <div
+                      className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                        campaignData.audienceType === "specific"
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-muted/50"
+                      }`}
+                      onClick={() =>
+                        setCampaignData({ ...campaignData, audienceType: "specific" })
+                      }
+                    >
+                      <RadioGroupItem value="specific" id="specific" />
+                      <div>
+                        <label htmlFor="specific" className="font-medium cursor-pointer">
+                          特定のメールアドレスに送信
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          メールアドレスを直接入力して送信
+                        </p>
+                      </div>
+                    </div>
                   </RadioGroup>
 
                   {campaignData.audienceType === "tags" && (
@@ -752,9 +794,30 @@ export function CampaignWizard({
                     </div>
                   )}
 
+                  {campaignData.audienceType === "specific" && (
+                    <div className="flex flex-col gap-3 mt-4 p-4 border rounded-lg">
+                      <Label>メールアドレスを入力</Label>
+                      <Textarea
+                        placeholder="test@example.com&#10;user@example.com&#10;（カンマまたは改行で区切り）"
+                        value={campaignData.specificEmails}
+                        onChange={(e) =>
+                          setCampaignData({
+                            ...campaignData,
+                            specificEmails: e.target.value,
+                          })
+                        }
+                        rows={5}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        複数のメールアドレスはカンマまたは改行で区切ってください
+                      </p>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm font-medium">
-                      送信対象: {audienceCount}件の連絡先
+                      送信対象: {audienceCount}件
+                      {campaignData.audienceType === "specific" ? "のメールアドレス" : "の連絡先"}
                     </p>
                   </div>
                 </div>
@@ -913,9 +976,80 @@ export function CampaignWizard({
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">本文</p>
-                    <pre className="text-xs whitespace-pre-wrap font-sans bg-muted p-3 rounded-lg max-h-96 overflow-auto">
+                    <pre className="text-xs whitespace-pre-wrap font-sans bg-muted p-3 rounded-lg max-h-64 overflow-auto">
                       {preview.body}
                     </pre>
+                  </div>
+                  
+                  {/* Test Send Section */}
+                  <div className="border-t pt-3 mt-2">
+                    <p className="text-xs font-medium mb-2">テスト送信</p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="test@example.com"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        className="text-xs h-8"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={testSending || !testEmail || !userSettings.sendFromEmail}
+                        onClick={async () => {
+                          setTestSending(true);
+                          setTestResult(null);
+                          try {
+                            const res = await fetch('/api/email/test', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                to: testEmail,
+                                subject: preview.subject,
+                                body: preview.body,
+                                fromName: userSettings.sendFromName,
+                                fromEmail: userSettings.sendFromEmail,
+                              }),
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              setTestResult({ success: true, message: '送信しました' });
+                            } else {
+                              setTestResult({ success: false, message: data.error });
+                            }
+                          } catch {
+                            setTestResult({ success: false, message: 'エラーが発生しました' });
+                          }
+                          setTestSending(false);
+                        }}
+                      >
+                        {testSending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                    {testResult && (
+                      <p className={`text-xs mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                        {testResult.success ? (
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            {testResult.message}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {testResult.message}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    {!userSettings.sendFromEmail && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        送信者設定が必要です
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (

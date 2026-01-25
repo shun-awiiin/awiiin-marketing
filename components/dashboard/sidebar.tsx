@@ -39,6 +39,7 @@ import {
   GitBranch,
   Filter,
   MessageSquare,
+  Share2,
 } from "lucide-react";
 
 const menuItems = [
@@ -86,6 +87,11 @@ const menuItems = [
     title: "分析",
     icon: BarChart3,
     href: "/dashboard/analytics",
+  },
+  {
+    title: "SNS投稿",
+    icon: Share2,
+    href: "/dashboard/social",
   },
 ];
 

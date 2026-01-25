@@ -45,34 +45,49 @@ export async function POST(
     }
 
     // Get target contacts
-    let contactsQuery = supabase
-      .from('contacts')
-      .select('id, email, first_name')
-      .eq('user_id', user.id)
-      .eq('status', 'active');
+    let contacts: { id: string | null; email: string; first_name: string | null }[] = [];
 
-    // Apply tag filter
-    if (campaign.filter_tags && campaign.filter_tags.length > 0) {
-      const { data: taggedContactIds } = await supabase
-        .from('contact_tags')
-        .select('contact_id')
-        .in('tag_id', campaign.filter_tags);
+    // Check if specific_emails is set
+    if (campaign.specific_emails && campaign.specific_emails.length > 0) {
+      // Use specific emails directly
+      contacts = campaign.specific_emails.map((email: string) => ({
+        id: null, // No contact ID for direct email addresses
+        email,
+        first_name: null
+      }));
+    } else {
+      // Get from contacts table
+      let contactsQuery = supabase
+        .from('contacts')
+        .select('id, email, first_name')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
 
-      if (taggedContactIds && taggedContactIds.length > 0) {
-        const uniqueIds = [...new Set(taggedContactIds.map(tc => tc.contact_id))];
-        contactsQuery = contactsQuery.in('id', uniqueIds);
-      } else {
-        // No contacts with these tags
-        return NextResponse.json({
-          error: 'No contacts match the selected tags'
-        }, { status: 400 });
+      // Apply tag filter
+      if (campaign.filter_tags && campaign.filter_tags.length > 0) {
+        const { data: taggedContactIds } = await supabase
+          .from('contact_tags')
+          .select('contact_id')
+          .in('tag_id', campaign.filter_tags);
+
+        if (taggedContactIds && taggedContactIds.length > 0) {
+          const uniqueIds = [...new Set(taggedContactIds.map(tc => tc.contact_id))];
+          contactsQuery = contactsQuery.in('id', uniqueIds);
+        } else {
+          // No contacts with these tags
+          return NextResponse.json({
+            error: 'No contacts match the selected tags'
+          }, { status: 400 });
+        }
       }
-    }
 
-    const { data: contacts, error: contactsError } = await contactsQuery;
+      const { data: contactsData, error: contactsError } = await contactsQuery;
 
-    if (contactsError) {
-      return NextResponse.json({ error: contactsError.message }, { status: 500 });
+      if (contactsError) {
+        return NextResponse.json({ error: contactsError.message }, { status: 500 });
+      }
+
+      contacts = contactsData || [];
     }
 
     if (!contacts || contacts.length === 0) {
@@ -137,7 +152,7 @@ export async function POST(
 
       return {
         campaign_id: id,
-        contact_id: contact.id,
+        contact_id: contact.id || null,
         to_email: contact.email,
         subject,
         body_text: bodyText,
@@ -145,13 +160,15 @@ export async function POST(
       };
     });
 
-    // Store unsubscribe tokens
-    const unsubscribeInserts = activeContacts.map(contact => ({
-      email: contact.email.toLowerCase(),
-      contact_id: contact.id,
-      campaign_id: id,
-      token: generateUnsubscribeToken(contact.email, id)
-    }));
+    // Store unsubscribe tokens (only for contacts with valid IDs or direct emails)
+    const unsubscribeInserts = activeContacts
+      .filter(contact => contact.email)
+      .map(contact => ({
+        email: contact.email.toLowerCase(),
+        contact_id: contact.id || null,
+        campaign_id: id,
+        token: generateUnsubscribeToken(contact.email, id)
+      }));
 
     // Upsert unsubscribe tokens (don't fail if exists)
     for (const unsub of unsubscribeInserts) {
