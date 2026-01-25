@@ -117,8 +117,31 @@ export function CampaignWizard({
   const [loading, setLoading] = useState(false);
   const [audienceCount, setAudienceCount] = useState(totalActiveContacts);
   const [showPreview, setShowPreview] = useState(false);
+  const [userSettings, setUserSettings] = useState<{
+    sendFromName: string;
+    sendFromEmail: string;
+  }>({ sendFromName: "", sendFromEmail: "" });
   const router = useRouter();
   const supabase = createClient();
+
+  // Fetch user settings for from_name and from_email defaults
+  useEffect(() => {
+    const fetchUserSettings = async () => {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("settings")
+        .eq("id", userId)
+        .single();
+
+      if (userData?.settings) {
+        setUserSettings({
+          sendFromName: userData.settings.sendFromName || "",
+          sendFromEmail: userData.settings.sendFromEmail || "",
+        });
+      }
+    };
+    fetchUserSettings();
+  }, [supabase, userId]);
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
@@ -261,6 +284,13 @@ export function CampaignWizard({
             extra_bullets: campaignData.extraBullets.filter((b) => b.trim()),
           };
 
+    // Validate sender settings
+    if (!userSettings.sendFromName || !userSettings.sendFromEmail) {
+      alert("送信者設定が未設定です。設定画面で「送信者名」と「送信元メールアドレス」を設定してください。");
+      setLoading(false);
+      return;
+    }
+
     const context = buildContext(campaignData.type, payload as SeminarInvitePayload | FreeTrialInvitePayload, null);
     const subjectTemplate = SUBJECT_VARIANTS[campaignData.type][campaignData.subjectIndex];
     const bodyRendered = renderTemplate(selectedTemplate.body_text, context);
@@ -278,8 +308,8 @@ export function CampaignWizard({
         variables: {},
         filter_tags:
           campaignData.audienceType === "tags" ? campaignData.selectedTags : null,
-        from_name: "配信担当",
-        from_email: process.env.NEXT_PUBLIC_FROM_EMAIL || "noreply@example.com",
+        from_name: userSettings.sendFromName,
+        from_email: userSettings.sendFromEmail,
         rate_limit_per_minute: 20,
         status: campaignData.scheduleType === "now" ? "scheduled" : "draft",
         scheduled_at:
@@ -798,6 +828,22 @@ export function CampaignWizard({
               {/* Step 5: Review */}
               {currentStep === "review" && (
                 <div className="flex flex-col gap-4">
+                  {/* Warning if sender settings not configured */}
+                  {(!userSettings.sendFromName || !userSettings.sendFromEmail) && (
+                    <div className="p-4 border border-red-300 bg-red-50 rounded-lg">
+                      <p className="text-red-700 font-medium">送信者設定が必要です</p>
+                      <p className="text-sm text-red-600 mt-1">
+                        設定画面で「送信者名」と「送信元メールアドレス」を設定してください。
+                        設定されていないとキャンペーンを作成できません。
+                      </p>
+                      <a
+                        href="/dashboard/settings"
+                        className="inline-block mt-2 text-sm text-red-700 underline"
+                      >
+                        設定画面を開く
+                      </a>
+                    </div>
+                  )}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="p-4 border rounded-lg">
                       <p className="text-sm text-muted-foreground">キャンペーン名</p>
@@ -819,6 +865,12 @@ export function CampaignWizard({
                         {campaignData.scheduleType === "now"
                           ? "今すぐ送信"
                           : new Date(campaignData.scheduledAt).toLocaleString("ja-JP")}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg col-span-2">
+                      <p className="text-sm text-muted-foreground">送信者情報</p>
+                      <p className="font-medium">
+                        {userSettings.sendFromName || "(未設定)"} &lt;{userSettings.sendFromEmail || "(未設定)"}&gt;
                       </p>
                     </div>
                   </div>
@@ -919,7 +971,10 @@ export function CampaignWizard({
           戻る
         </Button>
         {currentStep === "review" ? (
-          <Button onClick={handleCreate} disabled={loading}>
+          <Button
+            onClick={handleCreate}
+            disabled={loading || !userSettings.sendFromName || !userSettings.sendFromEmail}
+          >
             <Send className="mr-2 h-4 w-4" />
             {loading ? "作成中..." : "キャンペーンを作成"}
           </Button>
