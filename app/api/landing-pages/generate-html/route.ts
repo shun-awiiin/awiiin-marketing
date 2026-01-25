@@ -6,6 +6,7 @@ import {
   editSection,
   generateSection,
   generateAdvancedLP,
+  processLPImages,
   type LPSection,
   type LPGenerationInput,
 } from '@/lib/lp/html-generator'
@@ -167,6 +168,13 @@ export async function POST(request: NextRequest) {
       // 通常のセクションベースLP生成
       result = await generateLPHTML(validation.data, imageAnalysis)
     }
+
+    // 画像プレースホルダーを実際の画像URLに置き換え
+    result = await processLPImages(
+      result,
+      validation.data as LPGenerationInput,
+      validation.data.mood_template
+    )
 
     // 生成履歴を保存
     await supabase.from('lp_generation_history').insert({

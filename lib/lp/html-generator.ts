@@ -3,6 +3,21 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 // Gemini 3 API設定
 const MODEL_TEXT = 'gemini-3-flash-preview' // Gemini 3 Flash
 const MODEL_PRO = 'gemini-2.5-pro-preview-05-06' // 深い思考用
+const MODEL_IMAGE = 'imagen-3.0-generate-002' // Imagen 3（Nano Banana）
+
+// 画像プレースホルダーのパターン
+const IMAGE_PLACEHOLDERS = [
+  'IMAGE_PLACEHOLDER_HERO',
+  'IMAGE_PLACEHOLDER_PROBLEM',
+  'IMAGE_PLACEHOLDER_EMPATHY',
+  'IMAGE_PLACEHOLDER_SOLUTION',
+  'IMAGE_PLACEHOLDER_FEATURE_1',
+  'IMAGE_PLACEHOLDER_FEATURE_2',
+  'IMAGE_PLACEHOLDER_FEATURE_3',
+  'IMAGE_PLACEHOLDER_TESTIMONIAL_1',
+  'IMAGE_PLACEHOLDER_TESTIMONIAL_2',
+  'IMAGE_PLACEHOLDER_CTA',
+]
 
 export interface LPGenerationInput {
   product_name: string
@@ -154,11 +169,12 @@ CSSはstyle属性またはインラインで含める。
 const SECTION_INSTRUCTIONS: Record<string, string> = {
   hero: `
 【ヒーローセクション】
-- 画面いっぱいのインパクト（min-height: 80vh）
-- グラデーション背景
-- 大きなキャッチコピー（font-size: 2.5rem以上）
+- PC向けの適切な高さ（padding: 80px〜120px、min-heightは不要）
+- グラデーション背景またはリッチな背景画像
+- 大きなキャッチコピー（font-size: 2.5rem〜3rem）
 - サブコピー
 - 目立つCTAボタン
+- 画像プレースホルダー: <img src="IMAGE_PLACEHOLDER_HERO" alt="..." class="hero-image" style="max-width:500px;...">
 `,
   problem: `
 【問題提起セクション】
@@ -166,30 +182,35 @@ const SECTION_INSTRUCTIONS: Record<string, string> = {
 - 3〜5個の具体的な悩み
 - アイコンやチェックマーク使用
 - 共感を誘う表現
+- 画像プレースホルダー: <img src="IMAGE_PLACEHOLDER_PROBLEM" alt="..." style="max-width:400px;...">
 `,
   empathy: `
 【共感セクション】
 - 「その気持ち、よくわかります」
 - ターゲットの感情に寄り添う
 - 過去の失敗体験への理解
+- 画像プレースホルダー: <img src="IMAGE_PLACEHOLDER_EMPATHY" alt="..." style="max-width:400px;...">
 `,
   solution: `
 【解決策セクション】
 - 「だから〇〇を作りました」
 - 商品/サービスの紹介
 - 左右レイアウト（テキスト + イメージ）
+- 画像プレースホルダー: <img src="IMAGE_PLACEHOLDER_SOLUTION" alt="..." style="max-width:500px;...">
 `,
   features: `
 【特徴/ベネフィットセクション】
 - 3つのポイントをカード形式
 - アイコン + タイトル + 説明
 - グリッドレイアウト
+- 各カードに画像: <img src="IMAGE_PLACEHOLDER_FEATURE_1" ...>, IMAGE_PLACEHOLDER_FEATURE_2, IMAGE_PLACEHOLDER_FEATURE_3
 `,
   testimonials: `
 【お客様の声セクション】
 - 引用形式のデザイン
 - 名前と属性
 - 信頼感のあるレイアウト
+- プロフィール画像プレースホルダー: <img src="IMAGE_PLACEHOLDER_TESTIMONIAL_1" alt="..." style="width:60px;height:60px;border-radius:50%;...">
 `,
   faq: `
 【よくある質問セクション】
@@ -223,11 +244,22 @@ CVR5%以上を実現する、圧倒的に強いLPを生成してください。
 - 「100%保証」「絶対に」「必ず」「確実に」使用禁止
 - 「誰でも簡単に」「今だけ」「残りわずか」使用禁止
 
-### デザイン
+### デザイン（PC版デフォルト）
+- デフォルトはPC版の見た目（幅1200px想定）
+- ヒーローセクションは縦長にしない（min-height: 80vhは使わない、padding: 80px〜120px程度で十分）
 - モダンで洗練されたデザイン
-- 適切な余白（セクション間は60px以上）
+- 適切な余白（セクション間は60px〜80px）
 - CTAボタンは目立つ色で大きく
-- レスポンシブ対応
+- メディアクエリでスマホ対応（@media max-width: 768px）
+
+### 画像プレースホルダー（重要）
+各セクションに画像を含めてください。後で実際の画像に置き換えます。
+- ヒーロー: <img src="IMAGE_PLACEHOLDER_HERO" alt="メイン画像" style="max-width:500px;height:auto;border-radius:12px;">
+- 問題提起: <img src="IMAGE_PLACEHOLDER_PROBLEM" alt="問題イメージ" style="max-width:400px;height:auto;">
+- 共感: <img src="IMAGE_PLACEHOLDER_EMPATHY" alt="共感イメージ" style="max-width:400px;height:auto;">
+- 解決策: <img src="IMAGE_PLACEHOLDER_SOLUTION" alt="解決策イメージ" style="max-width:500px;height:auto;">
+- 特徴: IMAGE_PLACEHOLDER_FEATURE_1, IMAGE_PLACEHOLDER_FEATURE_2, IMAGE_PLACEHOLDER_FEATURE_3
+- CTA: <img src="IMAGE_PLACEHOLDER_CTA" alt="CTAイメージ" style="max-width:300px;height:auto;">
 
 ## 出力形式（重要）
 
@@ -1019,11 +1051,16 @@ function generateDefaultSections(input: LPGenerationInput): LPGenerationResult {
       {
         id: crypto.randomUUID(),
         type: 'hero',
-        html: `<section class="hero" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 20px; text-align: center; min-height: 80vh; display: flex; align-items: center; justify-content: center;">
-  <div style="max-width: 800px;">
-    <h1 style="font-size: clamp(28px, 5vw, 48px); font-weight: bold; margin-bottom: 20px;">${input.main_problem}を解決する</h1>
-    <p style="font-size: clamp(16px, 3vw, 24px); margin-bottom: 40px; opacity: 0.9;">${input.solution}</p>
-    <a href="#form" style="display: inline-block; background: #ff6b6b; color: white; padding: 18px 48px; border-radius: 50px; text-decoration: none; font-size: 18px; font-weight: bold; box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);">今すぐ申し込む</a>
+        html: `<section class="hero" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 80px 20px;">
+  <div style="max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 60px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 300px;">
+      <h1 style="font-size: 42px; font-weight: bold; margin-bottom: 20px; line-height: 1.3;">${input.main_problem}を解決する</h1>
+      <p style="font-size: 20px; margin-bottom: 40px; opacity: 0.9; line-height: 1.6;">${input.solution}</p>
+      <a href="#form" style="display: inline-block; background: #ff6b6b; color: white; padding: 18px 48px; border-radius: 50px; text-decoration: none; font-size: 18px; font-weight: bold; box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);">今すぐ申し込む</a>
+    </div>
+    <div style="flex: 1; min-width: 300px; text-align: center;">
+      <img src="IMAGE_PLACEHOLDER_HERO" alt="メイン画像" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+    </div>
   </div>
 </section>`,
         order: 0,
@@ -1032,13 +1069,18 @@ function generateDefaultSections(input: LPGenerationInput): LPGenerationResult {
         id: crypto.randomUUID(),
         type: 'problem',
         html: `<section class="problem" style="padding: 80px 20px; background: #f8f9fa;">
-  <div style="max-width: 800px; margin: 0 auto;">
-    <h2 style="font-size: clamp(24px, 4vw, 36px); text-align: center; margin-bottom: 40px;">こんなお悩みありませんか？</h2>
-    <ul style="list-style: none; max-width: 600px; margin: 0 auto;">
-      <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">${input.main_problem}</li>
-      <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">解決方法が分からない</li>
-      <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">時間がかかりすぎる</li>
-    </ul>
+  <div style="max-width: 1000px; margin: 0 auto; display: flex; align-items: center; gap: 60px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 300px;">
+      <img src="IMAGE_PLACEHOLDER_PROBLEM" alt="問題イメージ" style="max-width: 100%; height: auto; border-radius: 12px;">
+    </div>
+    <div style="flex: 1; min-width: 300px;">
+      <h2 style="font-size: 32px; margin-bottom: 30px;">こんなお悩みありませんか？</h2>
+      <ul style="list-style: none; padding: 0;">
+        <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">${input.main_problem}</li>
+        <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">解決方法が分からない</li>
+        <li style="padding: 20px; margin-bottom: 15px; background: white; border-left: 4px solid #ff6b6b; border-radius: 4px;">時間がかかりすぎる</li>
+      </ul>
+    </div>
   </div>
 </section>`,
         order: 1,
@@ -1047,21 +1089,24 @@ function generateDefaultSections(input: LPGenerationInput): LPGenerationResult {
         id: crypto.randomUUID(),
         type: 'solution',
         html: `<section class="solution" style="padding: 80px 20px;">
-  <div style="max-width: 1000px; margin: 0 auto;">
-    <h2 style="font-size: clamp(24px, 4vw, 36px); text-align: center; margin-bottom: 40px;">その悩み、解決できます</h2>
-    <p style="text-align: center; font-size: 18px; margin-bottom: 40px;">${input.solution}</p>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px;">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    <h2 style="font-size: 32px; text-align: center; margin-bottom: 20px;">その悩み、解決できます</h2>
+    <p style="text-align: center; font-size: 18px; margin-bottom: 50px; color: #666;">${input.solution}</p>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px;">
       <div style="background: white; padding: 40px 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <img src="IMAGE_PLACEHOLDER_FEATURE_1" alt="特徴1" style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 50%;">
         <h3 style="color: #667eea; margin-bottom: 15px; font-size: 20px;">簡単スタート</h3>
-        <p>初心者でも始められる</p>
+        <p style="color: #666;">初心者でも始められる</p>
       </div>
       <div style="background: white; padding: 40px 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <img src="IMAGE_PLACEHOLDER_FEATURE_2" alt="特徴2" style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 50%;">
         <h3 style="color: #667eea; margin-bottom: 15px; font-size: 20px;">確かな実績</h3>
-        <p>多くの方が成果を出しています</p>
+        <p style="color: #666;">多くの方が成果を出しています</p>
       </div>
       <div style="background: white; padding: 40px 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <img src="IMAGE_PLACEHOLDER_FEATURE_3" alt="特徴3" style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 50%;">
         <h3 style="color: #667eea; margin-bottom: 15px; font-size: 20px;">充実サポート</h3>
-        <p>困ったときも安心</p>
+        <p style="color: #666;">困ったときも安心</p>
       </div>
     </div>
   </div>
@@ -1071,11 +1116,16 @@ function generateDefaultSections(input: LPGenerationInput): LPGenerationResult {
       {
         id: crypto.randomUUID(),
         type: 'cta',
-        html: `<section class="cta" id="form" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 80px 20px; text-align: center;">
-  <div style="max-width: 600px; margin: 0 auto;">
-    <h2 style="font-size: clamp(24px, 4vw, 36px); margin-bottom: 20px; color: white;">今すぐ始めましょう</h2>
-    <p style="font-size: 32px; font-weight: bold; margin-bottom: 30px;">${input.price || '無料'}</p>
-    <a href="#" style="display: inline-block; background: #ff6b6b; color: white; padding: 24px 64px; border-radius: 50px; text-decoration: none; font-size: 22px; font-weight: bold; box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);">申し込む</a>
+        html: `<section class="cta" id="form" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 80px 20px;">
+  <div style="max-width: 800px; margin: 0 auto; display: flex; align-items: center; gap: 40px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 300px;">
+      <img src="IMAGE_PLACEHOLDER_CTA" alt="CTA画像" style="max-width: 100%; height: auto; border-radius: 12px;">
+    </div>
+    <div style="flex: 1; min-width: 300px; text-align: center;">
+      <h2 style="font-size: 32px; margin-bottom: 20px; color: white;">今すぐ始めましょう</h2>
+      <p style="font-size: 32px; font-weight: bold; margin-bottom: 30px;">${input.price || '無料'}</p>
+      <a href="#" style="display: inline-block; background: #ff6b6b; color: white; padding: 24px 64px; border-radius: 50px; text-decoration: none; font-size: 22px; font-weight: bold; box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);">申し込む</a>
+    </div>
   </div>
 </section>`,
         order: 3,
@@ -1165,5 +1215,136 @@ ${instruction}
     }
   } catch {
     return { html: currentHtml, css: currentCss }
+  }
+}
+
+// ========================================
+// 画像生成（Imagen 3 / Nano Banana）
+// ========================================
+
+export interface ImageGenerationPrompt {
+  placeholder: string
+  prompt: string
+  style?: string
+}
+
+// セクションタイプに基づいて画像プロンプトを生成
+export function generateImagePrompts(
+  input: LPGenerationInput,
+  moodTemplate?: { name: string; colorHint: string; toneHint: string } | null
+): ImageGenerationPrompt[] {
+  const style = moodTemplate?.name || 'モダン'
+  const colorHint = moodTemplate?.colorHint || ''
+  
+  return [
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_HERO',
+      prompt: `Professional marketing hero image for ${input.product_name}. Target audience: ${input.target_audience}. Style: ${style}, ${colorHint}. High quality, clean composition, inspirational.`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_PROBLEM',
+      prompt: `Illustration showing frustration or challenge related to: ${input.main_problem}. Style: ${style}, empathetic, relatable. Soft colors, professional.`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_EMPATHY',
+      prompt: `Warm, understanding illustration of a person experiencing: ${input.main_problem}. Style: ${style}, compassionate, supportive mood.`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_SOLUTION',
+      prompt: `Positive illustration showing the solution: ${input.solution}. Style: ${style}, optimistic, professional. Shows transformation and success.`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_FEATURE_1',
+      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_FEATURE_2',
+      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_FEATURE_3',
+      prompt: `Icon or illustration for product feature. Style: ${style}, clean, modern icon design. ${colorHint}`,
+      style,
+    },
+    {
+      placeholder: 'IMAGE_PLACEHOLDER_CTA',
+      prompt: `Call-to-action supporting image for ${input.product_name}. Style: ${style}, energetic, motivating. ${colorHint}`,
+      style,
+    },
+  ]
+}
+
+// Imagen 3で画像を生成（Vertex AI経由）
+export async function generateImage(prompt: string): Promise<string | null> {
+  // 現時点ではプレースホルダー画像を返す
+  // TODO: Vertex AI Imagen 3 APIを実装
+  const encodedPrompt = encodeURIComponent(prompt.slice(0, 100))
+  
+  // 高品質なプレースホルダー画像を返す
+  // 実際の実装ではImagen 3 APIを使用
+  const placeholderImages: Record<string, string> = {
+    hero: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&h=600&fit=crop',
+    problem: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&h=400&fit=crop',
+    empathy: 'https://images.unsplash.com/photo-1573497620053-ea5300f94f21?w=600&h=400&fit=crop',
+    solution: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop',
+    feature: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop',
+    cta: 'https://images.unsplash.com/photo-1553484771-371a605b060b?w=600&h=400&fit=crop',
+  }
+
+  // プロンプトからタイプを推測
+  if (prompt.toLowerCase().includes('hero')) return placeholderImages.hero
+  if (prompt.toLowerCase().includes('problem') || prompt.toLowerCase().includes('frustration')) return placeholderImages.problem
+  if (prompt.toLowerCase().includes('empathy') || prompt.toLowerCase().includes('understanding')) return placeholderImages.empathy
+  if (prompt.toLowerCase().includes('solution') || prompt.toLowerCase().includes('transformation')) return placeholderImages.solution
+  if (prompt.toLowerCase().includes('feature') || prompt.toLowerCase().includes('icon')) return placeholderImages.feature
+  if (prompt.toLowerCase().includes('cta') || prompt.toLowerCase().includes('call-to-action')) return placeholderImages.cta
+
+  // デフォルト
+  return `https://picsum.photos/seed/${encodedPrompt}/800/600`
+}
+
+// LPのHTML内のプレースホルダーを実際の画像URLに置き換え
+export async function replacePlaceholdersWithImages(
+  html: string,
+  input: LPGenerationInput,
+  moodTemplate?: { name: string; colorHint: string; toneHint: string } | null
+): Promise<string> {
+  const prompts = generateImagePrompts(input, moodTemplate)
+  let result = html
+
+  for (const { placeholder, prompt } of prompts) {
+    if (result.includes(placeholder)) {
+      const imageUrl = await generateImage(prompt)
+      if (imageUrl) {
+        result = result.replace(new RegExp(placeholder, 'g'), imageUrl)
+      }
+    }
+  }
+
+  return result
+}
+
+// LP生成結果の全セクションの画像を置き換え
+export async function processLPImages(
+  lpResult: LPGenerationResult,
+  input: LPGenerationInput,
+  moodTemplate?: { name: string; colorHint: string; toneHint: string } | null
+): Promise<LPGenerationResult> {
+  const processedSections = await Promise.all(
+    lpResult.sections.map(async (section) => ({
+      ...section,
+      html: await replacePlaceholdersWithImages(section.html, input, moodTemplate),
+    }))
+  )
+
+  return {
+    ...lpResult,
+    sections: processedSections,
   }
 }
