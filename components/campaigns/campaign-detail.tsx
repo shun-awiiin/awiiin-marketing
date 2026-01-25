@@ -4,7 +4,6 @@ import React from "react"
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,11 +37,22 @@ import {
 import { TestSendDialog } from "./test-send-dialog";
 import { RealtimeStats } from "./realtime-stats";
 import { ClientDate } from "@/components/ui/client-date";
+import { YouTubePostCard } from "./youtube-post-card";
+import { WhatsAppDMCard } from "./whatsapp-dm-card";
+import { XPostCard } from "./x-post-card";
+import { InstagramPostCard } from "./instagram-post-card";
+import type {
+  TemplateType,
+  SeminarInvitePayload,
+  FreeTrialInvitePayload,
+} from "@/lib/types/database";
 
 interface Campaign {
   id: string;
   name: string;
   status: string;
+  type: TemplateType;
+  input_payload: SeminarInvitePayload | FreeTrialInvitePayload;
   subject_override: string | null;
   body_override: string | null;
   scheduled_at: string | null;
@@ -83,7 +93,6 @@ interface CampaignDetailProps {
 export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProps) {
   const [currentStatus, setCurrentStatus] = useState(campaign.status);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   const handleStatusChange = async (newStatus: string) => {
@@ -264,9 +273,13 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
       />
 
       <Tabs defaultValue="messages">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="messages">送信履歴</TabsTrigger>
           <TabsTrigger value="content">メール内容</TabsTrigger>
+          <TabsTrigger value="x">X</TabsTrigger>
+          <TabsTrigger value="instagram">Instagram</TabsTrigger>
+          <TabsTrigger value="youtube">YouTube</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages" className="mt-4">
@@ -347,6 +360,38 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="x" className="mt-4">
+          <XPostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
+        </TabsContent>
+
+        <TabsContent value="instagram" className="mt-4">
+          <InstagramPostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
+        </TabsContent>
+
+        <TabsContent value="youtube" className="mt-4">
+          <YouTubePostCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-4">
+          <WhatsAppDMCard
+            campaignId={campaign.id}
+            campaignType={campaign.type}
+            inputPayload={campaign.input_payload}
+          />
         </TabsContent>
       </Tabs>
     </div>
