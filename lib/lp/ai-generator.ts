@@ -2,8 +2,8 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import type { LPBlock, LPGenerationInput, BlockType } from '@/lib/types/landing-page'
 
 // Gemini API設定
-const MODEL_TEXT = 'gemini-2.5-flash-preview-05-20' // 最新・高速・高品質
-const MODEL_TEXT_PRO = 'gemini-2.5-pro-preview-05-06' // 最高品質（オプション）
+const MODEL_TEXT = 'gemini-3-flash-preview' // Gemini 3 Flash - 最新・高速・高品質
+const MODEL_TEXT_PRO = 'gemini-3-pro' // Gemini 3 Pro - 最高品質（オプション）
 
 // システムプロンプト：専門家ペルソナ
 const SYSTEM_PROMPT = `あなたは、コンバージョン率を最大化することを専門とする経験豊富なWebデザイナー兼コピーライターです。
