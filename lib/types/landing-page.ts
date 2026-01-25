@@ -254,7 +254,7 @@ export interface LPTemplate {
 export const blockSettingsSchema = z.object({
   background_color: z.string().optional(),
   text_color: z.string().optional(),
-  padding: z.enum(['small', 'medium', 'large']).optional(),
+  padding: z.enum(['none', 'small', 'medium', 'large']).optional(),
   width: z.enum(['narrow', 'medium', 'full']).optional(),
   hidden: z.boolean().optional(),
 })
