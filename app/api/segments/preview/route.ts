@@ -24,13 +24,41 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Debug: Check contact_tags table directly
+    const tagCondition = validation.data.conditions.find(c => c.type === 'tag')
+    let debugInfo: Record<string, unknown> = {}
+    
+    if (tagCondition) {
+      const tagId = tagCondition.value as string
+      
+      // Count total contacts for user
+      const { count: totalContacts } = await supabase
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+      
+      // Count contact_tags for this tag
+      const { data: tagEntries, count: tagCount } = await supabase
+        .from('contact_tags')
+        .select('contact_id', { count: 'exact' })
+        .eq('tag_id', tagId)
+      
+      debugInfo = {
+        tagId,
+        totalContacts,
+        tagEntriesCount: tagCount,
+        sampleTagEntries: tagEntries?.slice(0, 3)
+      }
+    }
+
     console.log('Evaluating segment preview:', JSON.stringify(validation.data))
     const count = await countSegmentContacts(supabase, user.id, validation.data)
     console.log('Segment preview count:', count)
 
     return NextResponse.json({
       success: true,
-      data: { count }
+      data: { count },
+      debug: debugInfo  // Temporary debug info
     })
   } catch (error) {
     console.error('Segment preview error:', error)
