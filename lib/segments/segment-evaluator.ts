@@ -133,53 +133,105 @@ async function getContactIdsByTag(
   }
 
   if (condition.operator === 'exists') {
-    // Use JOIN query via RPC or direct query to avoid .in() limitation
-    // Get contacts that have this tag AND belong to this user
-    const { data, error } = await supabase
-      .from('contacts')
-      .select(`
-        id,
-        contact_tags!inner (
-          tag_id
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('contact_tags.tag_id', tagId)
+    // Approach: Get all contact_tags for this tag, then filter by user's contacts
+    // First, get all contact_ids that have this tag (no .in() limitation here)
+    const { data: taggedContacts, error: tagError } = await supabase
+      .from('contact_tags')
+      .select('contact_id')
+      .eq('tag_id', tagId)
 
-    if (error) {
-      console.error('Error fetching tagged contacts:', error.message)
+    if (tagError) {
+      console.error('Error fetching tagged contacts:', tagError.message)
       return []
     }
 
-    return data?.map(c => c.id) || []
+    if (!taggedContacts || taggedContacts.length === 0) {
+      return []
+    }
+
+    // Create a Set of tagged contact IDs for fast lookup
+    const taggedContactIds = new Set(taggedContacts.map(tc => tc.contact_id))
+
+    // Now get user's contacts and filter in memory
+    // Use pagination to handle large datasets
+    const allUserContactIds: string[] = []
+    let offset = 0
+    const pageSize = 1000
+
+    while (true) {
+      const { data: userContacts, error: userError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', userId)
+        .range(offset, offset + pageSize - 1)
+
+      if (userError) {
+        console.error('Error fetching user contacts:', userError.message)
+        break
+      }
+
+      if (!userContacts || userContacts.length === 0) {
+        break
+      }
+
+      // Filter contacts that have the tag
+      for (const contact of userContacts) {
+        if (taggedContactIds.has(contact.id)) {
+          allUserContactIds.push(contact.id)
+        }
+      }
+
+      if (userContacts.length < pageSize) {
+        break
+      }
+      offset += pageSize
+    }
+
+    return allUserContactIds
   } else if (condition.operator === 'not_exists') {
-    // Get all user contacts
-    const { data: allContacts, error: allError } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('user_id', userId)
+    // Get all contact_ids that have this tag
+    const { data: taggedContacts } = await supabase
+      .from('contact_tags')
+      .select('contact_id')
+      .eq('tag_id', tagId)
 
-    if (allError || !allContacts) {
-      console.error('Error fetching all contacts:', allError?.message)
-      return []
+    const taggedSet = new Set(taggedContacts?.map(tc => tc.contact_id) || [])
+
+    // Get all user contacts with pagination
+    const allUserContactIds: string[] = []
+    let offset = 0
+    const pageSize = 1000
+
+    while (true) {
+      const { data: userContacts, error: userError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', userId)
+        .range(offset, offset + pageSize - 1)
+
+      if (userError) {
+        console.error('Error fetching user contacts:', userError.message)
+        break
+      }
+
+      if (!userContacts || userContacts.length === 0) {
+        break
+      }
+
+      // Filter contacts that DON'T have the tag
+      for (const contact of userContacts) {
+        if (!taggedSet.has(contact.id)) {
+          allUserContactIds.push(contact.id)
+        }
+      }
+
+      if (userContacts.length < pageSize) {
+        break
+      }
+      offset += pageSize
     }
 
-    // Get contacts WITH this tag (using JOIN)
-    const { data: taggedData } = await supabase
-      .from('contacts')
-      .select(`
-        id,
-        contact_tags!inner (
-          tag_id
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('contact_tags.tag_id', tagId)
-
-    const taggedSet = new Set(taggedData?.map(c => c.id) || [])
-    return allContacts
-      .filter(c => !taggedSet.has(c.id))
-      .map(c => c.id)
+    return allUserContactIds
   }
 
   return []
