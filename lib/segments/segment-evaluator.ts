@@ -63,14 +63,37 @@ async function evaluateAnd(
     return []
   }
 
-  const { data } = await supabase
-    .from('contacts')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .in('id', contactIds)
+  // Use pagination to fetch contacts (avoid .in() limitation with large arrays)
+  const contactIdSet = new Set(contactIds)
+  const results: Contact[] = []
+  let offset = 0
+  const pageSize = 1000
 
-  return data || []
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', userId)
+      .range(offset, offset + pageSize - 1)
+
+    if (error || !batch || batch.length === 0) {
+      break
+    }
+
+    // Filter by contactIds in memory
+    for (const contact of batch) {
+      if (contactIdSet.has(contact.id)) {
+        results.push(contact as Contact)
+      }
+    }
+
+    if (batch.length < pageSize) {
+      break
+    }
+    offset += pageSize
+  }
+
+  return results
 }
 
 async function evaluateOr(
@@ -89,14 +112,36 @@ async function evaluateOr(
     return []
   }
 
-  const { data } = await supabase
-    .from('contacts')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .in('id', Array.from(allIds))
+  // Use pagination to fetch contacts (avoid .in() limitation with large arrays)
+  const results: Contact[] = []
+  let offset = 0
+  const pageSize = 1000
 
-  return data || []
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', userId)
+      .range(offset, offset + pageSize - 1)
+
+    if (error || !batch || batch.length === 0) {
+      break
+    }
+
+    // Filter by allIds in memory
+    for (const contact of batch) {
+      if (allIds.has(contact.id)) {
+        results.push(contact as Contact)
+      }
+    }
+
+    if (batch.length < pageSize) {
+      break
+    }
+    offset += pageSize
+  }
+
+  return results
 }
 
 async function getContactIdsForCondition(
