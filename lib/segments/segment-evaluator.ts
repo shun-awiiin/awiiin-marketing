@@ -132,20 +132,36 @@ async function getContactIdsByTag(
     return []
   }
 
+  console.log('getContactIdsByTag - tagId:', tagId, 'operator:', condition.operator)
+
   if (condition.operator === 'exists') {
     // First get all user's contacts
     const { data: userContacts, error: userError } = await supabase
       .from('contacts')
       .select('id')
       .eq('user_id', userId)
-      .eq('status', 'active')
 
-    if (userError || !userContacts || userContacts.length === 0) {
-      console.error('No user contacts found:', userError?.message)
+    console.log('User contacts count (all statuses):', userContacts?.length || 0)
+
+    if (userError) {
+      console.error('Error fetching user contacts:', userError.message)
+      return []
+    }
+
+    if (!userContacts || userContacts.length === 0) {
+      console.error('No user contacts found')
       return []
     }
 
     const userContactIds = userContacts.map(c => c.id)
+
+    // Check all contact_tags for this tag (without contact filter first)
+    const { data: allTaggedForTag, error: tagCheckError } = await supabase
+      .from('contact_tags')
+      .select('contact_id')
+      .eq('tag_id', tagId)
+
+    console.log('All contact_tags entries for this tag:', allTaggedForTag?.length || 0, 'error:', tagCheckError?.message)
 
     // Then get contacts with this tag that belong to the user
     const { data: taggedContacts, error: tagError } = await supabase
@@ -153,6 +169,8 @@ async function getContactIdsByTag(
       .select('contact_id')
       .eq('tag_id', tagId)
       .in('contact_id', userContactIds)
+
+    console.log('Tagged contacts for user:', taggedContacts?.length || 0, 'error:', tagError?.message)
 
     if (tagError) {
       console.error('Error fetching tagged contacts:', tagError.message)

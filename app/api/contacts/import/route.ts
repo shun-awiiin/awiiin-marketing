@@ -419,11 +419,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Bulk tags from import settings
+    // Bulk tags from import settings - apply to ALL imported contacts
     if (bulkTagIds.length > 0) {
-      const importedEmails = new Set([...toInsert.map(c => c.email)]);
+      // Include both new and updated contacts (all emails that were in the CSV)
+      const importedEmails = new Set([
+        ...toInsert.map(c => c.email.toLowerCase()),
+        ...toUpdate.map(u => {
+          const entry = Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id);
+          return entry ? entry[0] : '';
+        }).filter(Boolean)
+      ]);
+      
       for (const [email, contactId] of existingEmailMap.entries()) {
-        if (importedEmails.has(email)) {
+        if (importedEmails.has(email.toLowerCase())) {
           for (const tagId of bulkTagIds) {
             tagInserts.push({ contact_id: contactId, tag_id: tagId });
           }
@@ -451,13 +459,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // List assignment (process in parallel)
+    // List assignment (process in parallel) - apply to ALL imported contacts
     if (targetListId) {
-      const importedEmails = new Set([...toInsert.map(c => c.email)]);
+      // Include both new and updated contacts
+      const importedEmails = new Set([
+        ...toInsert.map(c => c.email.toLowerCase()),
+        ...toUpdate.map(u => {
+          const entry = Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id);
+          return entry ? entry[0] : '';
+        }).filter(Boolean)
+      ]);
       const listInserts: Array<{ list_id: string; contact_id: string }> = [];
       
       for (const [email, contactId] of existingEmailMap.entries()) {
-        if (importedEmails.has(email)) {
+        if (importedEmails.has(email.toLowerCase())) {
           listInserts.push({ list_id: targetListId, contact_id: contactId });
         }
       }
