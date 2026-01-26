@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { SegmentRules } from '@/lib/types/l-step'
 
 interface UseSegmentPreviewResult {
@@ -18,6 +18,9 @@ export function useSegmentPreview(
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Serialize rules to detect actual changes (not just reference changes)
+  const rulesKey = useMemo(() => JSON.stringify(rules), [rules])
+
   useEffect(() => {
     const fetchPreview = async () => {
       // Cancel previous request
@@ -30,6 +33,7 @@ export function useSegmentPreview(
       setError(null)
 
       try {
+        console.log('Fetching segment preview with rules:', rulesKey)
         const response = await fetch('/api/segments/preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -38,14 +42,17 @@ export function useSegmentPreview(
         })
 
         const result = await response.json()
+        console.log('Preview result:', result)
 
         if (result.success) {
           setCount(result.data.count)
         } else {
+          console.error('Preview error:', result.error)
           setError(result.error)
         }
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Preview fetch error:', err)
           setError('プレビューの取得に失敗しました')
         }
       } finally {
@@ -61,7 +68,7 @@ export function useSegmentPreview(
         abortControllerRef.current.abort()
       }
     }
-  }, [rules, delay])
+  }, [rulesKey, delay, rules])
 
   return { count, isLoading, error }
 }

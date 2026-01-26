@@ -127,37 +127,63 @@ async function getContactIdsByTag(
 ): Promise<string[]> {
   const tagId = condition.value as string
 
+  if (!tagId) {
+    console.error('Tag ID is empty')
+    return []
+  }
+
   if (condition.operator === 'exists') {
-    const { data } = await supabase
+    // First get all user's contacts
+    const { data: userContacts, error: userError } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+
+    if (userError || !userContacts || userContacts.length === 0) {
+      console.error('No user contacts found:', userError?.message)
+      return []
+    }
+
+    const userContactIds = userContacts.map(c => c.id)
+
+    // Then get contacts with this tag that belong to the user
+    const { data: taggedContacts, error: tagError } = await supabase
       .from('contact_tags')
       .select('contact_id')
       .eq('tag_id', tagId)
+      .in('contact_id', userContactIds)
 
-    if (!data) return []
+    if (tagError) {
+      console.error('Error fetching tagged contacts:', tagError.message)
+      return []
+    }
 
-    // Filter to user's contacts
-    const { data: userContacts } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('user_id', userId)
-      .in('id', data.map(d => d.contact_id))
-
-    return userContacts?.map(c => c.id) || []
+    return taggedContacts?.map(c => c.contact_id) || []
   } else if (condition.operator === 'not_exists') {
     // Get all user contacts
-    const { data: allContacts } = await supabase
+    const { data: allContacts, error: allError } = await supabase
       .from('contacts')
       .select('id')
       .eq('user_id', userId)
+      .eq('status', 'active')
+
+    if (allError || !allContacts) {
+      console.error('Error fetching all contacts:', allError?.message)
+      return []
+    }
+
+    const userContactIds = allContacts.map(c => c.id)
 
     // Get contacts with this tag
     const { data: taggedContacts } = await supabase
       .from('contact_tags')
       .select('contact_id')
       .eq('tag_id', tagId)
+      .in('contact_id', userContactIds)
 
     const taggedSet = new Set(taggedContacts?.map(c => c.contact_id) || [])
-    return (allContacts || [])
+    return allContacts
       .filter(c => !taggedSet.has(c.id))
       .map(c => c.id)
   }

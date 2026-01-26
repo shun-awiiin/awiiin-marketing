@@ -17,19 +17,23 @@ export async function POST(request: NextRequest) {
     const validation = segmentRulesSchema.safeParse(body.rules)
 
     if (!validation.success) {
+      console.error('Segment preview validation error:', validation.error.errors)
       return NextResponse.json({
         success: false,
         error: validation.error.errors[0].message
       }, { status: 400 })
     }
 
+    console.log('Evaluating segment preview:', JSON.stringify(validation.data))
     const count = await countSegmentContacts(supabase, user.id, validation.data)
+    console.log('Segment preview count:', count)
 
     return NextResponse.json({
       success: true,
       data: { count }
     })
   } catch (error) {
+    console.error('Segment preview error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
