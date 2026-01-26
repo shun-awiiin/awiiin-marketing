@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -91,6 +92,7 @@ export function SegmentEditDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>セグメントを編集</DialogTitle>
+          <DialogDescription>セグメントの条件を変更します</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

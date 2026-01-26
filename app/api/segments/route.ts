@@ -20,24 +20,28 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      // Table doesn't exist yet - return empty array
-      if (error.code === '42P01' || error.message.includes('does not exist')) {
-        return NextResponse.json({ success: true, data: [] })
-      }
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      // Table doesn't exist yet or other schema errors - return empty array
+      console.error('Segments fetch error:', error.code, error.message)
+      return NextResponse.json({ success: true, data: [] })
     }
 
     // Update contact counts
     const segmentsWithCounts = await Promise.all(
       (data || []).map(async (segment) => {
-        const count = await countSegmentContacts(supabase, user.id, segment.rules)
-        return { ...segment, contact_count: count }
+        try {
+          const count = await countSegmentContacts(supabase, user.id, segment.rules)
+          return { ...segment, contact_count: count }
+        } catch {
+          return { ...segment, contact_count: 0 }
+        }
       })
     )
 
     return NextResponse.json({ success: true, data: segmentsWithCounts })
-  } catch {
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error('Segments API error:', err)
+    // Return empty array instead of error for better UX
+    return NextResponse.json({ success: true, data: [] })
   }
 }
 

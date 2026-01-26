@@ -25,16 +25,17 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      // Table doesn't exist yet - return empty array
-      if (error.code === '42P01' || error.message.includes('does not exist')) {
-        return NextResponse.json({ success: true, data: [] })
-      }
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      // Table doesn't exist yet or other schema errors - return empty array
+      // Supabase error codes: 42P01 (table not found), PGRST116 (relation not found)
+      console.error('Lists fetch error:', error.code, error.message)
+      return NextResponse.json({ success: true, data: [] })
     }
 
     return NextResponse.json({ success: true, data: lists || [] })
-  } catch {
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error('Lists API error:', err)
+    // Return empty array instead of error for better UX
+    return NextResponse.json({ success: true, data: [] })
   }
 }
 

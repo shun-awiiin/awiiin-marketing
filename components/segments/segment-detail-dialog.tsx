@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -113,6 +114,7 @@ export function SegmentDetailDialog({ segment, tags, open, onClose, onEdit }: Pr
               編集
             </Button>
           </div>
+          <DialogDescription>セグメントの詳細と該当するコンタクト</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">

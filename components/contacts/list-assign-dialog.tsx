@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -93,12 +94,12 @@ export function ListAssignDialog({ contactIds, open, onClose, onComplete }: Prop
       <DialogContent>
         <DialogHeader>
           <DialogTitle>リストに追加</DialogTitle>
+          <DialogDescription>
+            {contactIds.length}件のコンタクトを追加するリストを選択してください
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {contactIds.length}件のコンタクトを追加するリストを選択してください
-          </p>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
