@@ -25,6 +25,10 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) {
+      // Table doesn't exist yet - return empty array
+      if (error.code === '42P01' || error.message.includes('does not exist')) {
+        return NextResponse.json({ success: true, data: [] })
+      }
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 

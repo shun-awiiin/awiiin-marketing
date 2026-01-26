@@ -197,18 +197,26 @@ export function useImportSettings() {
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        const [tagsRes, listsRes] = await Promise.all([
-          fetch('/api/tags'),
-          fetch('/api/lists')
-        ])
+        // Fetch tags
+        const tagsRes = await fetch('/api/tags')
+        if (tagsRes.ok) {
+          const tagsData = await tagsRes.json()
+          if (tagsData.data) setTags(tagsData.data)
+        }
 
-        const [tagsData, listsData] = await Promise.all([
-          tagsRes.json(),
-          listsRes.json()
-        ])
-
-        if (tagsData.data) setTags(tagsData.data)
-        if (listsData.success) setLists(listsData.data)
+        // Fetch lists separately to handle errors gracefully
+        try {
+          const listsRes = await fetch('/api/lists')
+          if (listsRes.ok) {
+            const listsData = await listsRes.json()
+            if (listsData.success && listsData.data) {
+              setLists(listsData.data)
+            }
+          }
+        } catch {
+          // Lists table might not exist yet
+          setLists([])
+        }
       } catch {
         // Handle silently
       } finally {

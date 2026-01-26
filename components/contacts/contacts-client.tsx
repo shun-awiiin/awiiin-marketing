@@ -465,15 +465,18 @@ export function ContactsClient({
         </div>
       )}
 
-      <ListAssignDialog
-        contactIds={selectedContacts}
-        open={isListDialogOpen}
-        onClose={() => setIsListDialogOpen(false)}
-        onComplete={() => {
-          setSelectedContacts([]);
-          router.refresh();
-        }}
-      />
+      {isListDialogOpen && (
+        <ListAssignDialog
+          contactIds={selectedContacts}
+          open={isListDialogOpen}
+          onClose={() => setIsListDialogOpen(false)}
+          onComplete={() => {
+            setSelectedContacts([]);
+            setIsListDialogOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { createSegmentSchema } from '@/lib/validation/l-step'
 import { countSegmentContacts } from '@/lib/segments/segment-evaluator'
 
 // GET /api/segments - List segments
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
+      // Table doesn't exist yet - return empty array
+      if (error.code === '42P01' || error.message.includes('does not exist')) {
+        return NextResponse.json({ success: true, data: [] })
+      }
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ success: true, data: segmentsWithCounts })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
