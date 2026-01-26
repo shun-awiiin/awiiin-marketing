@@ -419,24 +419,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Bulk tags from import settings - apply to ALL imported contacts
+    // Bulk tags from import settings - apply to ALL contacts in CSV
     if (bulkTagIds.length > 0) {
-      // Include both new and updated contacts (all emails that were in the CSV)
-      const importedEmails = new Set([
-        ...toInsert.map(c => c.email.toLowerCase()),
-        ...toUpdate.map(u => {
-          const entry = Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id);
-          return entry ? entry[0] : '';
-        }).filter(Boolean)
-      ]);
+      console.log('Bulk tag assignment - bulkTagIds:', bulkTagIds);
+      console.log('seenEmails size (CSV emails):', seenEmails.size);
+      console.log('existingEmailMap size:', existingEmailMap.size);
       
-      for (const [email, contactId] of existingEmailMap.entries()) {
-        if (importedEmails.has(email.toLowerCase())) {
+      // Use seenEmails (all valid emails from CSV) to assign tags
+      let taggedCount = 0;
+      for (const email of seenEmails) {
+        const contactId = existingEmailMap.get(email); // email is already lowercase
+        if (contactId) {
           for (const tagId of bulkTagIds) {
             tagInserts.push({ contact_id: contactId, tag_id: tagId });
+            taggedCount++;
           }
         }
       }
+      
+      console.log('Total tag inserts prepared:', taggedCount);
     }
 
     // Insert all tag assignments in parallel batches
@@ -459,23 +460,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // List assignment (process in parallel) - apply to ALL imported contacts
+    // List assignment (process in parallel) - apply to ALL contacts in CSV
     if (targetListId) {
-      // Include both new and updated contacts
-      const importedEmails = new Set([
-        ...toInsert.map(c => c.email.toLowerCase()),
-        ...toUpdate.map(u => {
-          const entry = Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id);
-          return entry ? entry[0] : '';
-        }).filter(Boolean)
-      ]);
+      console.log('List assignment - targetListId:', targetListId);
       const listInserts: Array<{ list_id: string; contact_id: string }> = [];
       
-      for (const [email, contactId] of existingEmailMap.entries()) {
-        if (importedEmails.has(email.toLowerCase())) {
+      // Use seenEmails (all valid emails from CSV) to assign to list
+      for (const email of seenEmails) {
+        const contactId = existingEmailMap.get(email);
+        if (contactId) {
           listInserts.push({ list_id: targetListId, contact_id: contactId });
         }
       }
+      
+      console.log('Total list inserts prepared:', listInserts.length);
 
       if (listInserts.length > 0) {
         const listBatches: typeof listInserts[] = [];
