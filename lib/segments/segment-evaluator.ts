@@ -120,6 +120,9 @@ async function getContactIdsForCondition(
   }
 }
 
+// Store debug info for segment evaluation
+export let lastEvalDebug: Record<string, unknown> = {}
+
 async function getContactIdsByTag(
   supabase: SupabaseClient,
   userId: string,
@@ -128,7 +131,7 @@ async function getContactIdsByTag(
   const tagId = condition.value as string
 
   if (!tagId) {
-    console.error('Tag ID is empty')
+    lastEvalDebug = { error: 'Tag ID is empty' }
     return []
   }
 
@@ -140,12 +143,20 @@ async function getContactIdsByTag(
       .select('contact_id')
       .eq('tag_id', tagId)
 
+    lastEvalDebug = {
+      step: 'after_contact_tags_query',
+      tagId,
+      taggedContactsCount: taggedContacts?.length || 0,
+      tagError: tagError?.message,
+      sampleTaggedIds: taggedContacts?.slice(0, 3).map(tc => tc.contact_id)
+    }
+
     if (tagError) {
-      console.error('Error fetching tagged contacts:', tagError.message)
       return []
     }
 
     if (!taggedContacts || taggedContacts.length === 0) {
+      lastEvalDebug = { ...lastEvalDebug, result: 'no tagged contacts found' }
       return []
     }
 
@@ -157,6 +168,7 @@ async function getContactIdsByTag(
     const allUserContactIds: string[] = []
     let offset = 0
     const pageSize = 1000
+    let totalUserContacts = 0
 
     while (true) {
       const { data: userContacts, error: userError } = await supabase
@@ -166,13 +178,15 @@ async function getContactIdsByTag(
         .range(offset, offset + pageSize - 1)
 
       if (userError) {
-        console.error('Error fetching user contacts:', userError.message)
+        lastEvalDebug = { ...lastEvalDebug, userError: userError.message }
         break
       }
 
       if (!userContacts || userContacts.length === 0) {
         break
       }
+
+      totalUserContacts += userContacts.length
 
       // Filter contacts that have the tag
       for (const contact of userContacts) {
@@ -185,6 +199,14 @@ async function getContactIdsByTag(
         break
       }
       offset += pageSize
+    }
+
+    lastEvalDebug = {
+      ...lastEvalDebug,
+      step: 'after_filtering',
+      totalUserContacts,
+      matchedCount: allUserContactIds.length,
+      sampleUserIds: allUserContactIds.slice(0, 3)
     }
 
     return allUserContactIds

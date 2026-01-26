@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { segmentRulesSchema } from '@/lib/validation/l-step'
-import { countSegmentContacts } from '@/lib/segments/segment-evaluator'
+import { countSegmentContacts, lastEvalDebug } from '@/lib/segments/segment-evaluator'
 
 // POST /api/segments/preview - Preview segment contact count
 export async function POST(request: NextRequest) {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: { count },
-      debug: debugInfo  // Temporary debug info
+      debug: { ...debugInfo, evalDebug: lastEvalDebug }  // Temporary debug info
     })
   } catch (error) {
     console.error('Segment preview error:', error)
