@@ -1,0 +1,279 @@
+{
+    "name": "Marketing Audio to Schedule & Email Automation",
+    "nodes": [
+      {
+        "parameters": {
+          "event": "fileCreated",
+          "watch": "folder",
+          "folderId": "your_folder_id_here",
+          "pollTimes": {
+            "item": [
+              {
+                "interval": 1,
+                "unit": "minutes"
+              }
+            ]
+          }
+        },
+        "id": "1",
+        "name": "Google Drive Trigger",
+        "type": "n8n-nodes-base.googleDriveTrigger",
+        "typeVersion": 1,
+        "position": [240, 300],
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "your_cred_id",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "download",
+          "fileId": "={{ $json.id }}",
+          "binaryPropertyName": "audioFile"
+        },
+        "id": "2",
+        "name": "Download Audio",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 2,
+        "position": [460, 300],
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "your_cred_id",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": "whisper-1",
+          "file": "={{ $binary.audioFile }}",
+          "options": {}
+        },
+        "id": "3",
+        "name": "Whisper Transcription",
+        "type": "n8n-nodes-base.openAi",
+        "typeVersion": 1,
+        "position": [680, 300],
+        "credentials": {
+          "openAiApi": {
+            "id": "your_openai_cred",
+            "name": "OpenAI account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "agent": "toolsAgent",
+          "model": "gemini-1.5-flash",
+          "systemMessage": "あなたはマーケティングチームのアシスタントです。与えられたテキストを分析し、以下のJSON形式のみで出力：{\"summary\":\"全体要約\",\"themes\":[{\"title\":\"タイトル\",\"description\":\"説明\",\"actions\":[\"アクション1\"],\"deadline\":\"YYYY-MM-DD\",\"priority\":\"高/中/低\"}]} 他のテキスト禁止。",
+          "prompt": "={{ $json.text }}",
+          "options": {
+            "requireSpecificOutputFormat": true
+          }
+        },
+        "id": "4",
+        "name": "AI Agent - Summarize & Extract",
+        "type": "n8n-nodes-base.aiAgent",
+        "typeVersion": 1,
+        "position": [900, 300],
+        "credentials": {
+          "googleGeminiApi": {
+            "id": "your_gemini_cred",
+            "name": "Gemini account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsonSchema": "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"},\"themes\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"deadline\":{\"type\":\"string\"},\"priority\":{\"type\":\"string\",\"enum\":[\"高\",\"中\",\"低\"]}}}}},\"required\":[\"summary\",\"themes\"]}"
+        },
+        "id": "5",
+        "name": "Structured Output Parser",
+        "type": "n8n-nodes-base.structuredOutputParser",
+        "typeVersion": 1,
+        "position": [1120, 300]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "sheetId": "your_sheet_id",
+          "range": "Sheet1!A:Z",
+          "options": {}
+        },
+        "id": "6",
+        "name": "Append to Sheets (Marketing Schedule)",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4,
+        "position": [1340, 300],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "your_sheets_cred",
+            "name": "Google Sheets"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "calendar": "primary",
+          "startDateTime": "={{ $json.themes[0].deadline }}T09:00:00",
+          "endDateTime": "={{ $json.themes[0].deadline }}T10:00:00",
+          "title": "={{ $json.themes[0].title }} 準備",
+          "description": "={{ $json.summary + '\\nActions: ' + $json.themes[0].actions.join(', ') }}",
+          "options": {}
+        },
+        "id": "7",
+        "name": "Create Calendar Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1,
+        "position": [1560, 300],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "your_calendar_cred",
+            "name": "Google Calendar"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "batchSize": 1,
+          "batchInterval": 0
+        },
+        "id": "8",
+        "name": "Loop Over Themes",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 1,
+        "position": [1780, 300]
+      },
+      {
+        "parameters": {
+          "fromEmail": "your@email.com",
+          "toEmail": "team@example.com",
+          "subject": "={{ $json.themes.title }} のお知らせ",
+          "text": "={{ $json.summary + '\\nアクション: ' + $json.themes.actions.join('\\n') + '\\n締切: ' + $json.themes.deadline }}",
+          "options": {}
+        },
+        "id": "9",
+        "name": "Send Email per Theme",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 1,
+        "position": [2000, 300],
+        "credentials": {
+          "gmailOAuth2Api": {
+            "id": "your_gmail_cred",
+            "name": "Gmail account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Google Drive Trigger": {
+        "main": [
+          [
+            {
+              "node": "Download Audio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Download Audio": {
+        "main": [
+          [
+            {
+              "node": "Whisper Transcription",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Whisper Transcription": {
+        "main": [
+          [
+            {
+              "node": "AI Agent - Summarize & Extract",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent - Summarize & Extract": {
+        "main": [
+          [
+            {
+              "node": "Structured Output Parser",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Structured Output Parser": {
+        "main": [
+          [
+            {
+              "node": "Append to Sheets (Marketing Schedule)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Append to Sheets (Marketing Schedule)": {
+        "main": [
+          [
+            {
+              "node": "Create Calendar Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Calendar Event": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Themes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Themes": {
+        "main": [
+          [
+            {
+              "node": "Send Email per Theme",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Email per Theme": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Themes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {},
+    "versionId": 1,
+    "meta": {
+      "instanceId": ""
+    },
+    "tags": []
+  }

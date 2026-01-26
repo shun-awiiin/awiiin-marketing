@@ -41,9 +41,11 @@ import {
   Tag,
   Download,
   UserPlus,
+  ListIcon,
 } from "lucide-react";
 import { CSVImportDialog } from "./csv-import-dialog";
 import { TagAssignDialog } from "./tag-assign-dialog";
+import { ListAssignDialog } from "./list-assign-dialog";
 
 interface Contact {
   id: string;
@@ -78,6 +80,7 @@ export function ContactsClient({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
+  const [isListDialogOpen, setIsListDialogOpen] = useState(false);
   const [newContact, setNewContact] = useState({
     email: "",
     first_name: "",
@@ -314,6 +317,14 @@ export function ContactsClient({
               />
             </Dialog>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsListDialogOpen(true)}
+            >
+              <ListIcon className="mr-2 h-4 w-4" />
+              リストに追加
+            </Button>
+            <Button
               variant="destructive"
               size="sm"
               onClick={handleBulkDelete}
@@ -402,6 +413,15 @@ export function ContactsClient({
                           <Tag className="mr-2 h-4 w-4" />
                           タグを付ける
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedContacts([contact.id]);
+                            setIsListDialogOpen(true);
+                          }}
+                        >
+                          <ListIcon className="mr-2 h-4 w-4" />
+                          リストに追加
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
@@ -444,6 +464,16 @@ export function ContactsClient({
           </div>
         </div>
       )}
+
+      <ListAssignDialog
+        contactIds={selectedContacts}
+        open={isListDialogOpen}
+        onClose={() => setIsListDialogOpen(false)}
+        onComplete={() => {
+          setSelectedContacts([]);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

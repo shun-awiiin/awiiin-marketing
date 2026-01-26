@@ -12,9 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { ImportSettings, useImportSettings } from "./import-settings";
 
 interface CSVImportDialogProps {
   userId: string;
@@ -43,9 +42,17 @@ export function CSVImportDialog({
   const [previewCount, setPreviewCount] = useState(0);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [updateExisting, setUpdateExisting] = useState(true);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const {
+    settings: importSettings,
+    setSettings: setImportSettings,
+    tags,
+    lists,
+    isLoading: isSettingsLoading,
+    reset: resetSettings
+  } = useImportSettings();
 
   const parseCSV = (text: string): string[][] => {
     const rows: string[][] = [];
@@ -211,7 +218,20 @@ export function CSVImportDialog({
 
         const formData = new FormData();
         formData.append("file", chunkFile);
-        formData.append("update_existing", updateExisting.toString());
+        formData.append("update_existing", importSettings.updateExisting.toString());
+        if (importSettings.selectedTagIds.length > 0) {
+          formData.append("tag_ids", importSettings.selectedTagIds.join(","));
+        }
+        if (importSettings.newTagName) {
+          formData.append("new_tag_name", importSettings.newTagName);
+          formData.append("new_tag_color", importSettings.newTagColor);
+        }
+        if (importSettings.selectedListId && importSettings.selectedListId !== 'new') {
+          formData.append("list_id", importSettings.selectedListId);
+        }
+        if (importSettings.selectedListId === 'new' && importSettings.newListName) {
+          formData.append("new_list_name", importSettings.newListName);
+        }
 
         const response = await fetch("/api/contacts/import", {
           method: "POST",
@@ -271,7 +291,7 @@ export function CSVImportDialog({
   };
 
   return (
-    <DialogContent className="sm:max-w-md">
+    <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>CSVインポート</DialogTitle>
         <DialogDescription>
@@ -363,22 +383,19 @@ export function CSVImportDialog({
             </label>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="update-existing"
-              checked={updateExisting}
-              onCheckedChange={(checked) => setUpdateExisting(checked as boolean)}
-            />
-            <Label htmlFor="update-existing" className="text-sm">
-              既存の連絡先を更新する
-            </Label>
-          </div>
+          <ImportSettings
+            settings={importSettings}
+            onChange={setImportSettings}
+            tags={tags}
+            lists={lists}
+            isLoading={isSettingsLoading || importing}
+          />
 
           <div className="text-xs text-muted-foreground p-3 bg-muted rounded-lg">
             <p className="font-medium mb-1">対応フォーマット:</p>
             <p className="mb-1">・標準: email, firstName, company, tags</p>
             <p className="mb-1">・HubSpot: Eメール, 名, 姓, Associated Company</p>
-            <p className="mt-2 text-green-600">✓ HubSpotからのエクスポートCSVに対応</p>
+            <p className="mt-2 text-green-600">HubSpotからのエクスポートCSVに対応</p>
           </div>
         </div>
       )}

@@ -42,6 +42,7 @@ import {
   Users,
   BarChart3,
   GraduationCap,
+  ListIcon,
 } from "lucide-react";
 import { XIcon } from "@/components/icons/x-icon";
 
@@ -109,6 +110,7 @@ const channelMenuItems = [
       "/dashboard/segments",
       "/dashboard/contacts",
       "/dashboard/tags",
+      "/dashboard/lists",
       "/dashboard/templates",
       "/dashboard/deliverability",
       "/dashboard/analytics",

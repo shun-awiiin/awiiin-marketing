@@ -22,13 +22,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, MoreHorizontal, Trash2, Users, Filter } from 'lucide-react'
+import { Plus, MoreHorizontal, Trash2, Users, Filter, Pencil, Eye } from 'lucide-react'
 import { SegmentBuilder } from './segment-builder'
+import { SegmentDetailDialog } from './segment-detail-dialog'
+import { SegmentEditDialog } from './segment-edit-dialog'
 import type { Segment, SegmentRules } from '@/lib/types/l-step'
 
 interface Props {
@@ -46,6 +49,9 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
     rules: { operator: 'AND' as const, conditions: [] }
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const handleCreate = async () => {
     if (!newSegment.name.trim()) {
@@ -97,6 +103,20 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
     } catch {
       // Handle error silently
     }
+  }
+
+  const handleOpenDetail = (segment: Segment) => {
+    setSelectedSegment(segment)
+    setIsDetailOpen(true)
+  }
+
+  const handleOpenEdit = (segment: Segment) => {
+    setSelectedSegment(segment)
+    setIsEditOpen(true)
+  }
+
+  const handleSave = (updated: Segment) => {
+    setSegments(segments.map(s => s.id === updated.id ? updated : s))
   }
 
   const getConditionSummary = (rules: SegmentRules): string => {
@@ -199,7 +219,11 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
               </TableHeader>
               <TableBody>
                 {segments.map((segment) => (
-                  <TableRow key={segment.id}>
+                  <TableRow
+                    key={segment.id}
+                    className="cursor-pointer"
+                    onClick={() => handleOpenDetail(segment)}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-medium">{segment.name}</p>
@@ -224,7 +248,7 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
                     <TableCell>
                       {new Date(segment.created_at).toLocaleDateString('ja-JP')}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
@@ -232,6 +256,15 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenDetail(segment)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            詳細
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEdit(segment)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            編集
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => handleDelete(segment.id)}
                             className="text-destructive"
@@ -248,6 +281,35 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
             </Table>
           </CardContent>
         </Card>
+      )}
+
+      {selectedSegment && (
+        <>
+          <SegmentDetailDialog
+            segment={selectedSegment}
+            tags={tags}
+            open={isDetailOpen}
+            onClose={() => {
+              setIsDetailOpen(false)
+              setSelectedSegment(null)
+            }}
+            onEdit={() => {
+              setIsDetailOpen(false)
+              setIsEditOpen(true)
+            }}
+          />
+          <SegmentEditDialog
+            segment={selectedSegment}
+            tags={tags}
+            customFields={customFields}
+            open={isEditOpen}
+            onClose={() => {
+              setIsEditOpen(false)
+              setSelectedSegment(null)
+            }}
+            onSave={handleSave}
+          />
+        </>
       )}
     </div>
   )
