@@ -119,13 +119,13 @@ export const segmentRulesSchema = z.object({
 
 export const createSegmentSchema = z.object({
   name: z.string().min(1, '名前は必須です').max(255, '名前は255文字以内で入力してください'),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(1000).nullable().optional(),
   rules: segmentRulesSchema
 })
 
 export const updateSegmentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(1000).nullable().optional(),
   rules: segmentRulesSchema.optional()
 })
 
