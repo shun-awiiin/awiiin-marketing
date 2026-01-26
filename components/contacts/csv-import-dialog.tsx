@@ -212,8 +212,15 @@ export function CSVImportDialog({
         alreadyExisted: 0,
       };
 
-      for (let i = 0; i < chunks.length; i++) {
-        const csvText = buildCSV(chunks[i]);
+      // Parallel chunk processing for speed
+      const CONCURRENT_UPLOADS = 3;
+      let completedChunks = 0;
+      let hasError = false;
+
+      const processChunk = async (chunk: string[][]): Promise<ImportResult | null> => {
+        if (hasError) return null;
+
+        const csvText = buildCSV(chunk);
         const chunkFile = new File([csvText], file.name, { type: "text/csv" });
 
         const formData = new FormData();
@@ -248,30 +255,49 @@ export function CSVImportDialog({
                 )
                 .join(" / ")
             : "";
+          hasError = true;
           setError(
             `${data.error || "インポートに失敗しました"}${detailsText ? ` - ${detailsText}` : ""}`
           );
-          setImporting(false);
-          return;
+          return null;
         }
 
-        const chunkResult: ImportResult = data.data;
-        aggregate.total += chunkResult.total;
-        aggregate.created += chunkResult.created;
-        aggregate.updated += chunkResult.updated;
-        aggregate.skipped += chunkResult.skipped;
-        aggregate.invalid += chunkResult.invalid;
-        aggregate.errors = aggregate.errors.concat(chunkResult.errors || []);
-        aggregate.existingInDb = Math.max(
-          aggregate.existingInDb || 0,
-          chunkResult.existingInDb || 0
-        );
-        aggregate.alreadyExisted = Math.max(
-          aggregate.alreadyExisted || 0,
-          chunkResult.alreadyExisted || 0
-        );
+        completedChunks++;
+        setProgress(Math.round((completedChunks / chunks.length) * 100));
 
-        setProgress(Math.round(((i + 1) / chunks.length) * 100));
+        return data.data as ImportResult;
+      };
+
+      // Process chunks in parallel batches
+      for (let i = 0; i < chunks.length; i += CONCURRENT_UPLOADS) {
+        if (hasError) break;
+
+        const parallelChunks = chunks.slice(i, i + CONCURRENT_UPLOADS);
+        const results = await Promise.all(parallelChunks.map(processChunk));
+
+        for (const chunkResult of results) {
+          if (chunkResult) {
+            aggregate.total += chunkResult.total;
+            aggregate.created += chunkResult.created;
+            aggregate.updated += chunkResult.updated;
+            aggregate.skipped += chunkResult.skipped;
+            aggregate.invalid += chunkResult.invalid;
+            aggregate.errors = aggregate.errors.concat(chunkResult.errors || []);
+            aggregate.existingInDb = Math.max(
+              aggregate.existingInDb || 0,
+              chunkResult.existingInDb || 0
+            );
+            aggregate.alreadyExisted = Math.max(
+              aggregate.alreadyExisted || 0,
+              chunkResult.alreadyExisted || 0
+            );
+          }
+        }
+      }
+
+      if (hasError) {
+        setImporting(false);
+        return;
       }
 
       setResult(aggregate);

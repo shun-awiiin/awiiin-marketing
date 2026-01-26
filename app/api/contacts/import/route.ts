@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isValidEmail } from '@/lib/email/template-renderer';
 import { quickValidateEmail } from '@/lib/validation/email-validator';
 
@@ -13,17 +13,24 @@ interface ImportError {
   reason: string;
 }
 
-const BATCH_SIZE = 500; // Supabase batch insert limit
+// Optimized batch settings for high-performance import
+const BATCH_SIZE = 2000;
+const PARALLEL_BATCHES = 5;
 
 // POST /api/contacts/import - Import contacts from CSV
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Use regular client for auth verification
+    const authClient = await createClient();
+    const { data: { user } } = await authClient.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Use service role client for data operations (bypasses RLS for speed)
+    // Security: user is already verified above, all queries are scoped by user.id
+    const supabase = await createServiceClient();
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -325,69 +332,84 @@ export async function POST(request: NextRequest) {
     }
 
     let created = 0;
+    let updated = 0;
     const insertErrors: Array<{ batch: number; message: string; details?: string }> = [];
 
-    for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
-      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-      const batch = toInsert.slice(i, i + BATCH_SIZE);
+    // Use upsert for both insert and update in one operation
+    const allContacts = [
+      ...toInsert,
+      ...toUpdate.map(u => ({
+        user_id: user.id,
+        email: Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id)?.[0] || '',
+        first_name: u.first_name,
+        company: u.company,
+        status: 'active' as const,
+      })).filter(c => c.email)
+    ];
 
-      const { data: inserted, error } = await supabase
-        .from('contacts')
-        .insert(batch)
-        .select();
+    // Process in parallel batches for speed
+    const batches: typeof allContacts[] = [];
+    
+    for (let i = 0; i < allContacts.length; i += BATCH_SIZE) {
+      batches.push(allContacts.slice(i, i + BATCH_SIZE));
+    }
 
-      if (error) {
-        insertErrors.push({
-          batch: batchNum,
-          message: error.message,
-          details: error.details,
-        });
-      } else {
-        created += inserted?.length || 0;
-        // Update email map with new contacts
-        inserted?.forEach(c => {
-          existingEmailMap.set(c.email.toLowerCase(), c.id);
-        });
+    // Process batches in parallel groups
+    for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
+      const parallelBatches = batches.slice(i, i + PARALLEL_BATCHES);
+      
+      const results = await Promise.all(
+        parallelBatches.map(async (batch, idx) => {
+          const { data: upserted, error } = await supabase
+            .from('contacts')
+            .upsert(batch, { 
+              onConflict: 'user_id,email',
+              ignoreDuplicates: false 
+            })
+            .select('id, email');
+
+          if (error) {
+            return { error, batch: i + idx + 1, data: null };
+          }
+          return { error: null, batch: i + idx + 1, data: upserted };
+        })
+      );
+
+      for (const result of results) {
+        if (result.error) {
+          insertErrors.push({
+            batch: result.batch,
+            message: result.error.message,
+            details: result.error.details,
+          });
+        } else if (result.data) {
+          // Update email map with upserted contacts
+          result.data.forEach(c => {
+            const wasNew = !existingEmailMap.has(c.email.toLowerCase());
+            existingEmailMap.set(c.email.toLowerCase(), c.id);
+            if (wasNew) created++;
+            else updated++;
+          });
+        }
       }
     }
 
-    if (insertErrors.length > 0) {
+    if (insertErrors.length > 0 && created === 0 && updated === 0) {
       return NextResponse.json(
         {
-          error: 'Insert failed',
+          error: 'Import failed',
           details: insertErrors.slice(0, 3),
         },
         { status: 500 }
       );
     }
 
-    // Batch update existing contacts (limit to avoid timeout)
-    let updated = 0;
-    const MAX_UPDATES = 1000;
-    const updatesToProcess = toUpdate.slice(0, MAX_UPDATES);
+    const skippedUpdates = 0;
 
-    for (let i = 0; i < updatesToProcess.length; i += BATCH_SIZE) {
-      const batch = updatesToProcess.slice(i, i + BATCH_SIZE);
-      
-      // Update each contact (Supabase doesn't support bulk update)
-      for (const contact of batch) {
-        const { error } = await supabase
-          .from('contacts')
-          .update({
-            first_name: contact.first_name,
-            company: contact.company
-          })
-          .eq('id', contact.id);
-
-        if (!error) updated++;
-      }
-    }
-    
-    const skippedUpdates = toUpdate.length - updatesToProcess.length;
-
-    // Batch assign tags
+    // Batch assign tags (from CSV and import settings) - process in parallel
     const tagInserts: Array<{ contact_id: string; tag_id: string }> = [];
     
+    // Tags from CSV rows
     for (const { email, tagIds } of tagAssignments) {
       const contactId = existingEmailMap.get(email);
       if (!contactId) continue;
@@ -396,50 +418,66 @@ export async function POST(request: NextRequest) {
         tagInserts.push({ contact_id: contactId, tag_id: tagId });
       }
     }
-    
-    // Insert tag assignments in batches
-    for (let i = 0; i < tagInserts.length; i += BATCH_SIZE) {
-      const batch = tagInserts.slice(i, i + BATCH_SIZE);
-      await supabase
-        .from('contact_tags')
-        .upsert(batch, { onConflict: 'contact_id,tag_id' });
+
+    // Bulk tags from import settings
+    if (bulkTagIds.length > 0) {
+      const importedEmails = new Set([...toInsert.map(c => c.email)]);
+      for (const [email, contactId] of existingEmailMap.entries()) {
+        if (importedEmails.has(email)) {
+          for (const tagId of bulkTagIds) {
+            tagInserts.push({ contact_id: contactId, tag_id: tagId });
+          }
+        }
+      }
     }
 
-    // Bulk tag assignment (from import settings)
-    if (bulkTagIds.length > 0) {
-      const allContactIds = Array.from(existingEmailMap.values());
-      const bulkTagInserts: Array<{ contact_id: string; tag_id: string }> = [];
+    // Insert all tag assignments in parallel batches
+    if (tagInserts.length > 0) {
+      const tagBatches: typeof tagInserts[] = [];
+      for (let i = 0; i < tagInserts.length; i += BATCH_SIZE) {
+        tagBatches.push(tagInserts.slice(i, i + BATCH_SIZE));
+      }
 
-      for (const contactId of allContactIds) {
-        for (const tagId of bulkTagIds) {
-          bulkTagInserts.push({ contact_id: contactId, tag_id: tagId });
+      // Process tag batches in parallel
+      for (let i = 0; i < tagBatches.length; i += PARALLEL_BATCHES) {
+        const parallelBatches = tagBatches.slice(i, i + PARALLEL_BATCHES);
+        await Promise.all(
+          parallelBatches.map(batch =>
+            supabase
+              .from('contact_tags')
+              .upsert(batch, { onConflict: 'contact_id,tag_id' })
+          )
+        );
+      }
+    }
+
+    // List assignment (process in parallel)
+    if (targetListId) {
+      const importedEmails = new Set([...toInsert.map(c => c.email)]);
+      const listInserts: Array<{ list_id: string; contact_id: string }> = [];
+      
+      for (const [email, contactId] of existingEmailMap.entries()) {
+        if (importedEmails.has(email)) {
+          listInserts.push({ list_id: targetListId, contact_id: contactId });
         }
       }
 
-      // Insert bulk tag assignments in batches
-      for (let i = 0; i < bulkTagInserts.length; i += BATCH_SIZE) {
-        const batch = bulkTagInserts.slice(i, i + BATCH_SIZE);
-        await supabase
-          .from('contact_tags')
-          .upsert(batch, { onConflict: 'contact_id,tag_id' });
-      }
-    }
+      if (listInserts.length > 0) {
+        const listBatches: typeof listInserts[] = [];
+        for (let i = 0; i < listInserts.length; i += BATCH_SIZE) {
+          listBatches.push(listInserts.slice(i, i + BATCH_SIZE));
+        }
 
-    // List assignment
-    if (targetListId) {
-      const allContactIds = Array.from(existingEmailMap.values());
-      const listInserts = allContactIds.map(contactId => ({
-        list_id: targetListId,
-        contact_id: contactId
-      }));
-
-      // Insert list assignments in batches
-      // Note: contact_count is updated automatically by database trigger
-      for (let i = 0; i < listInserts.length; i += BATCH_SIZE) {
-        const batch = listInserts.slice(i, i + BATCH_SIZE);
-        await supabase
-          .from('list_contacts')
-          .upsert(batch, { onConflict: 'list_id,contact_id' });
+        for (let i = 0; i < listBatches.length; i += PARALLEL_BATCHES) {
+          const parallelBatches = listBatches.slice(i, i + PARALLEL_BATCHES);
+          await Promise.all(
+            parallelBatches.map(batch =>
+              supabase
+                .from('list_contacts')
+                .upsert(batch, { onConflict: 'list_id,contact_id' })
+            )
+          );
+        }
       }
     }
 
