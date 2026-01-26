@@ -33,6 +33,7 @@ export default $config({
     // SST v3: subscribe に直接ハンドラーを指定
     emailQueue.subscribe({
       handler: "packages/functions/email-worker.handler",
+      runtime: "nodejs22.x",
       timeout: "60 seconds",
       memory: "256 MB",
       environment: {
