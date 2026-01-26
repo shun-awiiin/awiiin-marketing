@@ -9,7 +9,7 @@ export default async function NewCampaignPage() {
 
   if (!user) return null;
 
-  const [templatesResult, tagsResult, contactCountResult] = await Promise.all([
+  const [templatesResult, tagsResult, contactCountResult, segmentsResult] = await Promise.all([
     supabase
       .from("templates")
       .select("*")
@@ -21,12 +21,18 @@ export default async function NewCampaignPage() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("status", "active"),
+    supabase
+      .from("segments")
+      .select("id, name, description, contact_count")
+      .eq("user_id", user.id)
+      .order("name"),
   ]);
 
   return (
     <CampaignWizard
       templates={templatesResult.data ?? []}
       tags={tagsResult.data ?? []}
+      segments={segmentsResult.data ?? []}
       totalActiveContacts={contactCountResult.count ?? 0}
       userId={user.id}
     />

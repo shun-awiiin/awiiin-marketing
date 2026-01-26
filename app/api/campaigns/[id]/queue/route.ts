@@ -7,6 +7,7 @@ import {
   generateUnsubscribeToken
 } from '@/lib/email/template-renderer';
 import { queueCampaignMessages } from '@/lib/sqs/sqs-client';
+import { evaluateSegment } from '@/lib/segments/segment-evaluator';
 import type { TemplateType, SeminarInvitePayload, FreeTrialInvitePayload } from '@/lib/types/database';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -59,6 +60,33 @@ export async function POST(
         email,
         first_name: null
       }));
+    } else if (campaign.segment_id) {
+      // Use segment-based targeting
+      const { data: segment, error: segmentError } = await supabase
+        .from('segments')
+        .select('rules')
+        .eq('id', campaign.segment_id)
+        .single();
+
+      if (segmentError || !segment) {
+        return NextResponse.json({
+          error: 'Segment not found'
+        }, { status: 400 });
+      }
+
+      // Evaluate segment to get matching contacts
+      const segmentContacts = await evaluateSegment(supabase, user.id, segment.rules);
+      contacts = segmentContacts.map(c => ({
+        id: c.id,
+        email: c.email,
+        first_name: c.first_name || null
+      }));
+
+      if (contacts.length === 0) {
+        return NextResponse.json({
+          error: 'No contacts match the segment criteria'
+        }, { status: 400 });
+      }
     } else {
       // Get from contacts table
       let contactsQuery = supabase

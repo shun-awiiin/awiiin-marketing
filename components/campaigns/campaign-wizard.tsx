@@ -49,15 +49,24 @@ import {
   Template,
   Tag,
 } from "@/lib/types/database";
+import type { Segment } from "@/lib/types/l-step";
 import {
   renderTemplate,
   generateSubject,
   buildContext,
 } from "@/lib/email/template-renderer";
 
+interface SegmentOption {
+  id: string;
+  name: string;
+  description: string | null;
+  contact_count: number;
+}
+
 interface CampaignWizardProps {
   templates: Template[];
   tags: Tag[];
+  segments: SegmentOption[];
   totalActiveContacts: number;
   userId: string;
 }
@@ -91,6 +100,7 @@ const templateTypeInfo: Record<
 export function CampaignWizard({
   templates,
   tags,
+  segments,
   totalActiveContacts,
   userId,
 }: CampaignWizardProps) {
@@ -100,8 +110,9 @@ export function CampaignWizard({
     type: "" as TemplateType | "",
     templateId: "",
     subjectIndex: 0,
-    audienceType: "all" as "all" | "tags" | "specific",
+    audienceType: "all" as "all" | "tags" | "segment" | "specific",
     selectedTags: [] as string[],
+    selectedSegmentId: "" as string,
     specificEmails: "" as string, // comma or newline separated
     scheduleType: "now" as "now" | "later",
     scheduledAt: "",
@@ -173,7 +184,7 @@ export function CampaignWizard({
     }
   }, [campaignData.type, filteredTemplates, campaignData.templateId]);
 
-  // Fetch audience count when tags/emails change
+  // Fetch audience count when tags/emails/segment change
   useEffect(() => {
     const fetchAudienceCount = async () => {
       if (campaignData.audienceType === "all") {
@@ -185,7 +196,11 @@ export function CampaignWizard({
           .map((e) => e.trim())
           .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
         setAudienceCount(emails.length);
-      } else if (campaignData.selectedTags.length > 0) {
+      } else if (campaignData.audienceType === "segment" && campaignData.selectedSegmentId) {
+        // Get segment contact count
+        const segment = segments.find(s => s.id === campaignData.selectedSegmentId);
+        setAudienceCount(segment?.contact_count ?? 0);
+      } else if (campaignData.audienceType === "tags" && campaignData.selectedTags.length > 0) {
         const { count } = await supabase
           .from("contact_tags")
           .select("contact_id", { count: "exact", head: true })
@@ -196,7 +211,7 @@ export function CampaignWizard({
       }
     };
     fetchAudienceCount();
-  }, [campaignData.audienceType, campaignData.selectedTags, campaignData.specificEmails, totalActiveContacts, supabase]);
+  }, [campaignData.audienceType, campaignData.selectedTags, campaignData.selectedSegmentId, campaignData.specificEmails, totalActiveContacts, supabase, segments]);
 
   // Generate preview content
   const preview = useMemo(() => {
@@ -250,6 +265,7 @@ export function CampaignWizard({
         return false;
       case "audience":
         if (campaignData.audienceType === "all") return true;
+        if (campaignData.audienceType === "segment") return campaignData.selectedSegmentId !== "";
         if (campaignData.audienceType === "tags") return campaignData.selectedTags.length > 0;
         if (campaignData.audienceType === "specific") {
           // Check if at least one valid email is entered
@@ -336,6 +352,8 @@ export function CampaignWizard({
         variables: {},
         filter_tags:
           campaignData.audienceType === "tags" ? campaignData.selectedTags : null,
+        segment_id:
+          campaignData.audienceType === "segment" ? campaignData.selectedSegmentId : null,
         specific_emails: specificEmailsList,
         from_name: userSettings.sendFromName,
         from_email: userSettings.sendFromEmail,
@@ -711,7 +729,7 @@ export function CampaignWizard({
                 <div className="flex flex-col gap-4">
                   <RadioGroup
                     value={campaignData.audienceType}
-                    onValueChange={(value: "all" | "tags" | "specific") =>
+                    onValueChange={(value: "all" | "tags" | "segment" | "specific") =>
                       setCampaignData({ ...campaignData, audienceType: value })
                     }
                     className="flex flex-col gap-3"
@@ -736,6 +754,28 @@ export function CampaignWizard({
                         </p>
                       </div>
                     </div>
+                    {segments.length > 0 && (
+                      <div
+                        className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                          campaignData.audienceType === "segment"
+                            ? "border-primary bg-primary/5"
+                            : "hover:bg-muted/50"
+                        }`}
+                        onClick={() =>
+                          setCampaignData({ ...campaignData, audienceType: "segment" })
+                        }
+                      >
+                        <RadioGroupItem value="segment" id="segment" />
+                        <div>
+                          <label htmlFor="segment" className="font-medium cursor-pointer">
+                            セグメントで絞り込み
+                          </label>
+                          <p className="text-sm text-muted-foreground">
+                            条件に基づいた動的なグループに送信
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div
                       className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
                         campaignData.audienceType === "tags"
@@ -777,6 +817,39 @@ export function CampaignWizard({
                       </div>
                     </div>
                   </RadioGroup>
+
+                  {campaignData.audienceType === "segment" && (
+                    <div className="flex flex-col gap-3 mt-4 p-4 border rounded-lg">
+                      <Label>セグメントを選択</Label>
+                      <Select
+                        value={campaignData.selectedSegmentId}
+                        onValueChange={(value) =>
+                          setCampaignData({ ...campaignData, selectedSegmentId: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="セグメントを選択" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {segments.map((segment) => (
+                            <SelectItem key={segment.id} value={segment.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{segment.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({segment.contact_count}件)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {campaignData.selectedSegmentId && (
+                        <p className="text-xs text-muted-foreground">
+                          {segments.find(s => s.id === campaignData.selectedSegmentId)?.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {campaignData.audienceType === "tags" && (
                     <div className="flex flex-col gap-3 mt-4 p-4 border rounded-lg">
