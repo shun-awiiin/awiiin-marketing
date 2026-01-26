@@ -136,32 +136,54 @@ async function getContactIdsByTag(
   }
 
   if (condition.operator === 'exists') {
-    // Approach: Get all contact_tags for this tag, then filter by user's contacts
-    // First, get all contact_ids that have this tag (no .in() limitation here)
-    const { data: taggedContacts, error: tagError } = await supabase
-      .from('contact_tags')
-      .select('contact_id')
-      .eq('tag_id', tagId)
+    // Approach: Get all contact_tags for this tag with pagination (Supabase default limit is 1000)
+    const taggedContactIds = new Set<string>()
+    let tagOffset = 0
+    const tagPageSize = 1000
+    let tagError: string | undefined
+
+    while (true) {
+      const { data: taggedBatch, error } = await supabase
+        .from('contact_tags')
+        .select('contact_id')
+        .eq('tag_id', tagId)
+        .range(tagOffset, tagOffset + tagPageSize - 1)
+
+      if (error) {
+        tagError = error.message
+        break
+      }
+
+      if (!taggedBatch || taggedBatch.length === 0) {
+        break
+      }
+
+      for (const tc of taggedBatch) {
+        taggedContactIds.add(tc.contact_id)
+      }
+
+      if (taggedBatch.length < tagPageSize) {
+        break
+      }
+      tagOffset += tagPageSize
+    }
 
     lastEvalDebug = {
       step: 'after_contact_tags_query',
       tagId,
-      taggedContactsCount: taggedContacts?.length || 0,
-      tagError: tagError?.message,
-      sampleTaggedIds: taggedContacts?.slice(0, 3).map(tc => tc.contact_id)
+      taggedContactsCount: taggedContactIds.size,
+      tagError,
+      sampleTaggedIds: Array.from(taggedContactIds).slice(0, 3)
     }
 
     if (tagError) {
       return []
     }
 
-    if (!taggedContacts || taggedContacts.length === 0) {
+    if (taggedContactIds.size === 0) {
       lastEvalDebug = { ...lastEvalDebug, result: 'no tagged contacts found' }
       return []
     }
-
-    // Create a Set of tagged contact IDs for fast lookup
-    const taggedContactIds = new Set(taggedContacts.map(tc => tc.contact_id))
 
     // Now get user's contacts and filter in memory
     // Use pagination to handle large datasets
@@ -211,13 +233,31 @@ async function getContactIdsByTag(
 
     return allUserContactIds
   } else if (condition.operator === 'not_exists') {
-    // Get all contact_ids that have this tag
-    const { data: taggedContacts } = await supabase
-      .from('contact_tags')
-      .select('contact_id')
-      .eq('tag_id', tagId)
+    // Get all contact_ids that have this tag (with pagination)
+    const taggedSet = new Set<string>()
+    let tagOffset = 0
+    const tagPageSize = 1000
 
-    const taggedSet = new Set(taggedContacts?.map(tc => tc.contact_id) || [])
+    while (true) {
+      const { data: taggedBatch, error } = await supabase
+        .from('contact_tags')
+        .select('contact_id')
+        .eq('tag_id', tagId)
+        .range(tagOffset, tagOffset + tagPageSize - 1)
+
+      if (error || !taggedBatch || taggedBatch.length === 0) {
+        break
+      }
+
+      for (const tc of taggedBatch) {
+        taggedSet.add(tc.contact_id)
+      }
+
+      if (taggedBatch.length < tagPageSize) {
+        break
+      }
+      tagOffset += tagPageSize
+    }
 
     // Get all user contacts with pagination
     const allUserContactIds: string[] = []
@@ -232,7 +272,6 @@ async function getContactIdsByTag(
         .range(offset, offset + pageSize - 1)
 
       if (userError) {
-        console.error('Error fetching user contacts:', userError.message)
         break
       }
 
