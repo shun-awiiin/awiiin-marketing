@@ -26,28 +26,34 @@ export async function POST(request: NextRequest) {
 
     // Debug: Check contact_tags table directly
     const tagCondition = validation.data.conditions.find(c => c.type === 'tag')
-    let debugInfo: Record<string, unknown> = {}
+    let debugInfo: Record<string, unknown> = {
+      version: 'v3-pagination',  // Version marker to confirm deployment
+      userId: user.id
+    }
     
     if (tagCondition) {
       const tagId = tagCondition.value as string
       
       // Count total contacts for user
-      const { count: totalContacts } = await supabase
+      const { count: totalContacts, error: contactError } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
       
-      // Count contact_tags for this tag
-      const { data: tagEntries, count: tagCount } = await supabase
+      // Count contact_tags for this tag (via RLS)
+      const { data: tagEntries, count: tagCount, error: tagError } = await supabase
         .from('contact_tags')
         .select('contact_id', { count: 'exact' })
         .eq('tag_id', tagId)
       
       debugInfo = {
+        ...debugInfo,
         tagId,
         totalContacts,
+        contactError: contactError?.message,
         tagEntriesCount: tagCount,
-        sampleTagEntries: tagEntries?.slice(0, 3)
+        tagError: tagError?.message,
+        sampleTagEntries: tagEntries?.slice(0, 5)
       }
     }
 
