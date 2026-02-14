@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// deploy test: 2026-02-15
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
