@@ -42,7 +42,11 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/u/') ||
-    request.nextUrl.pathname.startsWith('/api/webhooks')
+    request.nextUrl.pathname.startsWith('/f/') ||
+    request.nextUrl.pathname.startsWith('/unsubscribe') ||
+    request.nextUrl.pathname.startsWith('/api/webhooks') ||
+    request.nextUrl.pathname.startsWith('/api/forms/public') ||
+    request.nextUrl.pathname.startsWith('/api/chat/public')
 
   if (!user && !isPublicPath) {
     // no user, redirect to login page
