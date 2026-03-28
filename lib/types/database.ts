@@ -98,6 +98,9 @@ export interface Campaign {
   body_override: string | null;
   variables: Record<string, string> | null;
   filter_tags: string[] | null;
+  segment_id: string | null;
+  list_id: string | null;
+  specific_emails: string[] | null;
   from_name: string;
   from_email: string;
   rate_limit_per_minute: number;

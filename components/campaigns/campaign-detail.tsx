@@ -33,6 +33,10 @@ import {
   Clock,
   AlertTriangle,
   Mail,
+  Users,
+  List,
+  Filter,
+  Tag,
 } from "lucide-react";
 import { TestSendDialog } from "./test-send-dialog";
 import { RealtimeStats } from "./realtime-stats";
@@ -55,6 +59,10 @@ interface Campaign {
   input_payload: SeminarInvitePayload | FreeTrialInvitePayload;
   subject_override: string | null;
   body_override: string | null;
+  filter_tags: string[] | null;
+  segment_id: string | null;
+  list_id: string | null;
+  specific_emails: string[] | null;
   scheduled_at: string | null;
   created_at: string;
   templates: {
@@ -62,6 +70,8 @@ interface Campaign {
     subject: string;
     body_text: string;
   } | null;
+  list_info: { name: string; contact_count: number } | null;
+  segment_info: { name: string; contact_count: number } | null;
 }
 
 interface Message {
@@ -265,6 +275,49 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
           )}
         </div>
       </div>
+
+      {/* Recipient Source */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">宛先情報</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            {campaign.list_id && campaign.list_info ? (
+              <>
+                <List className="h-4 w-4 text-muted-foreground" />
+                <span>リスト: {campaign.list_info.name}</span>
+                <span className="text-sm text-muted-foreground">
+                  ({campaign.list_info.contact_count}件)
+                </span>
+              </>
+            ) : campaign.segment_id && campaign.segment_info ? (
+              <>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span>セグメント: {campaign.segment_info.name}</span>
+                <span className="text-sm text-muted-foreground">
+                  ({campaign.segment_info.contact_count}件)
+                </span>
+              </>
+            ) : campaign.filter_tags && campaign.filter_tags.length > 0 ? (
+              <>
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <span>タグフィルター ({campaign.filter_tags.length}件のタグ)</span>
+              </>
+            ) : campaign.specific_emails && campaign.specific_emails.length > 0 ? (
+              <>
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>指定メールアドレス ({campaign.specific_emails.length}件)</span>
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span>全ての有効な連絡先</span>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Real-time Statistics */}
       <RealtimeStats

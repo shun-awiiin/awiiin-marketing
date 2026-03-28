@@ -63,10 +63,19 @@ interface SegmentOption {
   contact_count: number;
 }
 
+interface ListOption {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  contact_count: number;
+}
+
 interface CampaignWizardProps {
   templates: Template[];
   tags: Tag[];
   segments: SegmentOption[];
+  lists: ListOption[];
   totalActiveContacts: number;
   userId: string;
 }
@@ -101,6 +110,7 @@ export function CampaignWizard({
   templates,
   tags,
   segments,
+  lists,
   totalActiveContacts,
   userId,
 }: CampaignWizardProps) {
@@ -110,9 +120,10 @@ export function CampaignWizard({
     type: "" as TemplateType | "",
     templateId: "",
     subjectIndex: 0,
-    audienceType: "all" as "all" | "tags" | "segment" | "specific",
+    audienceType: "all" as "all" | "tags" | "segment" | "list" | "specific",
     selectedTags: [] as string[],
     selectedSegmentId: "" as string,
+    selectedListId: "" as string,
     specificEmails: "" as string, // comma or newline separated
     scheduleType: "now" as "now" | "later",
     scheduledAt: "",
@@ -196,6 +207,9 @@ export function CampaignWizard({
           .map((e) => e.trim())
           .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
         setAudienceCount(emails.length);
+      } else if (campaignData.audienceType === "list" && campaignData.selectedListId) {
+        const list = lists.find(l => l.id === campaignData.selectedListId);
+        setAudienceCount(list?.contact_count ?? 0);
       } else if (campaignData.audienceType === "segment" && campaignData.selectedSegmentId) {
         // Get segment contact count
         const segment = segments.find(s => s.id === campaignData.selectedSegmentId);
@@ -211,7 +225,7 @@ export function CampaignWizard({
       }
     };
     fetchAudienceCount();
-  }, [campaignData.audienceType, campaignData.selectedTags, campaignData.selectedSegmentId, campaignData.specificEmails, totalActiveContacts, supabase, segments]);
+  }, [campaignData.audienceType, campaignData.selectedTags, campaignData.selectedSegmentId, campaignData.selectedListId, campaignData.specificEmails, totalActiveContacts, supabase, segments, lists]);
 
   // Generate preview content
   const preview = useMemo(() => {
@@ -265,6 +279,7 @@ export function CampaignWizard({
         return false;
       case "audience":
         if (campaignData.audienceType === "all") return true;
+        if (campaignData.audienceType === "list") return campaignData.selectedListId !== "";
         if (campaignData.audienceType === "segment") return campaignData.selectedSegmentId !== "";
         if (campaignData.audienceType === "tags") return campaignData.selectedTags.length > 0;
         if (campaignData.audienceType === "specific") {
@@ -354,6 +369,8 @@ export function CampaignWizard({
           campaignData.audienceType === "tags" ? campaignData.selectedTags : null,
         segment_id:
           campaignData.audienceType === "segment" ? campaignData.selectedSegmentId : null,
+        list_id:
+          campaignData.audienceType === "list" ? campaignData.selectedListId : null,
         specific_emails: specificEmailsList,
         from_name: userSettings.sendFromName,
         from_email: userSettings.sendFromEmail,
@@ -729,7 +746,7 @@ export function CampaignWizard({
                 <div className="flex flex-col gap-4">
                   <RadioGroup
                     value={campaignData.audienceType}
-                    onValueChange={(value: "all" | "tags" | "segment" | "specific") =>
+                    onValueChange={(value: "all" | "tags" | "segment" | "list" | "specific") =>
                       setCampaignData({ ...campaignData, audienceType: value })
                     }
                     className="flex flex-col gap-3"
@@ -754,6 +771,28 @@ export function CampaignWizard({
                         </p>
                       </div>
                     </div>
+                    {lists.length > 0 && (
+                      <div
+                        className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                          campaignData.audienceType === "list"
+                            ? "border-primary bg-primary/5"
+                            : "hover:bg-muted/50"
+                        }`}
+                        onClick={() =>
+                          setCampaignData({ ...campaignData, audienceType: "list" })
+                        }
+                      >
+                        <RadioGroupItem value="list" id="list" />
+                        <div>
+                          <label htmlFor="list" className="font-medium cursor-pointer">
+                            リストから選択
+                          </label>
+                          <p className="text-sm text-muted-foreground">
+                            静的リストに登録された連絡先に送信
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {segments.length > 0 && (
                       <div
                         className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -817,6 +856,43 @@ export function CampaignWizard({
                       </div>
                     </div>
                   </RadioGroup>
+
+                  {campaignData.audienceType === "list" && (
+                    <div className="flex flex-col gap-3 mt-4 p-4 border rounded-lg">
+                      <Label>リストを選択</Label>
+                      <Select
+                        value={campaignData.selectedListId}
+                        onValueChange={(value) =>
+                          setCampaignData({ ...campaignData, selectedListId: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="リストを選択" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lists.map((list) => (
+                            <SelectItem key={list.id} value={list.id}>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="inline-block w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: list.color }}
+                                />
+                                <span>{list.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({list.contact_count}件)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {campaignData.selectedListId && (
+                        <p className="text-xs text-muted-foreground">
+                          {lists.find(l => l.id === campaignData.selectedListId)?.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {campaignData.audienceType === "segment" && (
                     <div className="flex flex-col gap-3 mt-4 p-4 border rounded-lg">
@@ -1009,6 +1085,16 @@ export function CampaignWizard({
                     <div className="p-4 border rounded-lg">
                       <p className="text-sm text-muted-foreground">送信対象</p>
                       <p className="font-medium">{audienceCount}件の連絡先</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {campaignData.audienceType === "all" && "全ての有効な連絡先"}
+                        {campaignData.audienceType === "list" &&
+                          `リスト: ${lists.find(l => l.id === campaignData.selectedListId)?.name ?? ""}`}
+                        {campaignData.audienceType === "segment" &&
+                          `セグメント: ${segments.find(s => s.id === campaignData.selectedSegmentId)?.name ?? ""}`}
+                        {campaignData.audienceType === "tags" &&
+                          `タグ: ${campaignData.selectedTags.length}件選択`}
+                        {campaignData.audienceType === "specific" && "指定メールアドレス"}
+                      </p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <p className="text-sm text-muted-foreground">スケジュール</p>

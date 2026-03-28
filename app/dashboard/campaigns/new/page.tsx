@@ -33,8 +33,20 @@ export default async function NewCampaignPage() {
       .order("name");
     segmentsData = data ?? [];
   } catch {
-    // Table doesn't exist yet
     segmentsData = [];
+  }
+
+  // Fetch lists separately to handle table not existing
+  let listsData: Array<{ id: string; name: string; description: string | null; color: string; contact_count: number }> = [];
+  try {
+    const { data } = await supabase
+      .from("lists")
+      .select("id, name, description, color, contact_count")
+      .eq("user_id", user.id)
+      .order("name");
+    listsData = data ?? [];
+  } catch {
+    listsData = [];
   }
 
   return (
@@ -42,6 +54,7 @@ export default async function NewCampaignPage() {
       templates={templatesResult.data ?? []}
       tags={tagsResult.data ?? []}
       segments={segmentsData}
+      lists={listsData}
       totalActiveContacts={contactCountResult.count ?? 0}
       userId={user.id}
     />

@@ -45,10 +45,34 @@ export default async function CampaignDetailPage({
     template = templateData;
   }
 
-  // キャンペーンにテンプレート情報を追加
+  // リスト情報を取得
+  let listInfo = null;
+  if (campaign.list_id) {
+    const { data } = await supabase
+      .from("lists")
+      .select("name, contact_count")
+      .eq("id", campaign.list_id)
+      .single();
+    listInfo = data;
+  }
+
+  // セグメント情報を取得
+  let segmentInfo = null;
+  if (campaign.segment_id) {
+    const { data } = await supabase
+      .from("segments")
+      .select("name, contact_count")
+      .eq("id", campaign.segment_id)
+      .single();
+    segmentInfo = data;
+  }
+
+  // キャンペーンにテンプレート・宛先情報を追加
   const campaignWithTemplate = {
     ...campaign,
-    templates: template
+    templates: template,
+    list_info: listInfo,
+    segment_info: segmentInfo,
   };
 
   const [messagesResult, statsResult] = await Promise.all([

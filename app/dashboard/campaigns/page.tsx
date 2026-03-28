@@ -14,7 +14,9 @@ export default async function CampaignsPage() {
     .select(
       `
       *,
-      templates(name)
+      templates(name),
+      lists(name),
+      segments(name)
     `
     )
     .eq("user_id", user.id)

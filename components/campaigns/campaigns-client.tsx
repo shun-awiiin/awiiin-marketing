@@ -31,15 +31,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, MoreHorizontal, Eye, Trash2, Send, Pause, Play } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Eye, Trash2, Send, Pause, Play, Users, List, Filter, Tag, Mail } from "lucide-react";
 
 interface Campaign {
   id: string;
   name: string;
   status: string;
+  filter_tags: string[] | null;
+  segment_id: string | null;
+  list_id: string | null;
+  specific_emails: string[] | null;
   scheduled_at: string | null;
   created_at: string;
   templates: { name: string } | null;
+  lists: { name: string } | null;
+  segments: { name: string } | null;
 }
 
 interface CampaignsClientProps {
@@ -187,6 +193,47 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
 
   const isActiveStatus = (status: string) => ACTIVE_STATUSES.includes(status);
 
+  const getRecipientSource = (campaign: Campaign) => {
+    if (campaign.list_id && campaign.lists) {
+      return (
+        <span className="flex items-center gap-1 text-sm">
+          <List className="h-3 w-3" />
+          {campaign.lists.name}
+        </span>
+      );
+    }
+    if (campaign.segment_id && campaign.segments) {
+      return (
+        <span className="flex items-center gap-1 text-sm">
+          <Filter className="h-3 w-3" />
+          {campaign.segments.name}
+        </span>
+      );
+    }
+    if (campaign.filter_tags && campaign.filter_tags.length > 0) {
+      return (
+        <span className="flex items-center gap-1 text-sm">
+          <Tag className="h-3 w-3" />
+          タグ ({campaign.filter_tags.length})
+        </span>
+      );
+    }
+    if (campaign.specific_emails && campaign.specific_emails.length > 0) {
+      return (
+        <span className="flex items-center gap-1 text-sm">
+          <Mail className="h-3 w-3" />
+          指定 ({campaign.specific_emails.length})
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Users className="h-3 w-3" />
+        全連絡先
+      </span>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -246,6 +293,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
               </TableHead>
               <TableHead>キャンペーン名</TableHead>
               <TableHead>テンプレート</TableHead>
+              <TableHead>宛先</TableHead>
               <TableHead>ステータス</TableHead>
               <TableHead>予定日時</TableHead>
               <TableHead>作成日</TableHead>
@@ -255,7 +303,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
           <TableBody>
             {filteredCampaigns.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={8} className="h-32 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Send className="h-8 w-8 text-muted-foreground/50" />
                     <p className="text-muted-foreground">キャンペーンがありません</p>
@@ -278,6 +326,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
                   </TableCell>
                   <TableCell className="font-medium">{campaign.name}</TableCell>
                   <TableCell>{campaign.templates?.name || "-"}</TableCell>
+                  <TableCell>{getRecipientSource(campaign)}</TableCell>
                   <TableCell>{getStatusBadge(campaign.status)}</TableCell>
                   <TableCell>
                     {campaign.scheduled_at

@@ -60,6 +60,44 @@ export async function POST(
         email,
         first_name: null
       }));
+    } else if (campaign.list_id) {
+      // Use static list-based targeting
+      const { data: listContacts, error: listError } = await supabase
+        .from('list_contacts')
+        .select('contact_id')
+        .eq('list_id', campaign.list_id);
+
+      if (listError) {
+        return NextResponse.json({
+          error: `Failed to fetch list contacts: ${listError.message}`
+        }, { status: 500 });
+      }
+
+      if (!listContacts || listContacts.length === 0) {
+        return NextResponse.json({
+          error: 'No contacts in the selected list'
+        }, { status: 400 });
+      }
+
+      const contactIds = listContacts.map(lc => lc.contact_id);
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, email, first_name')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .in('id', contactIds);
+
+      if (contactsError) {
+        return NextResponse.json({ error: contactsError.message }, { status: 500 });
+      }
+
+      contacts = contactsData || [];
+
+      if (contacts.length === 0) {
+        return NextResponse.json({
+          error: 'No active contacts in the selected list'
+        }, { status: 400 });
+      }
     } else if (campaign.segment_id) {
       // Use segment-based targeting
       const { data: segment, error: segmentError } = await supabase
