@@ -204,7 +204,7 @@ export default function PublicFormPage() {
 
         {formData.fields.map((field) => (
           <PublicField
-            key={field.id}
+            key={field.name}
             field={field}
             value={values[field.name]}
             onChange={(v) => updateValue(field.name, v)}
@@ -284,15 +284,19 @@ function PublicField({ field, value, onChange, onToggleCheckbox }: PublicFieldPr
             onValueChange={(v) => onChange(v)}
             required={field.required}
           >
-            <SelectTrigger id={field.id}>
+            <SelectTrigger id={field.name}>
               <SelectValue placeholder={field.placeholder || "選択してください"} />
             </SelectTrigger>
             <SelectContent>
-              {(field.options || []).map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
+              {(field.options || []).map((opt) => {
+                const optValue = typeof opt === "string" ? opt : opt.value
+                const optLabel = typeof opt === "string" ? opt : opt.label
+                return (
+                  <SelectItem key={optValue} value={optValue}>
+                    {optLabel}
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -307,14 +311,18 @@ function PublicField({ field, value, onChange, onToggleCheckbox }: PublicFieldPr
             onValueChange={(v) => onChange(v)}
             required={field.required}
           >
-            {(field.options || []).map((opt) => (
-              <div key={opt} className="flex items-center gap-2">
-                <RadioGroupItem value={opt} id={`${field.id}-${opt}`} />
-                <Label htmlFor={`${field.id}-${opt}`} className="font-normal">
-                  {opt}
-                </Label>
-              </div>
-            ))}
+            {(field.options || []).map((opt) => {
+              const optValue = typeof opt === "string" ? opt : opt.value
+              const optLabel = typeof opt === "string" ? opt : opt.label
+              return (
+                <div key={optValue} className="flex items-center gap-2">
+                  <RadioGroupItem value={optValue} id={`${field.name}-${optValue}`} />
+                  <Label htmlFor={`${field.name}-${optValue}`} className="font-normal">
+                    {optLabel}
+                  </Label>
+                </div>
+              )
+            })}
           </RadioGroup>
         </div>
       )
@@ -325,18 +333,22 @@ function PublicField({ field, value, onChange, onToggleCheckbox }: PublicFieldPr
         return (
           <div className="space-y-2">
             {labelElement}
-            {field.options.map((opt) => (
-              <div key={opt} className="flex items-center gap-2">
-                <Checkbox
-                  id={`${field.id}-${opt}`}
-                  checked={checked.includes(opt)}
-                  onCheckedChange={() => onToggleCheckbox(opt)}
-                />
-                <Label htmlFor={`${field.id}-${opt}`} className="font-normal">
-                  {opt}
-                </Label>
-              </div>
-            ))}
+            {field.options.map((opt) => {
+              const optValue = typeof opt === "string" ? opt : opt.value
+              const optLabel = typeof opt === "string" ? opt : opt.label
+              return (
+                <div key={optValue} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`${field.name}-${optValue}`}
+                    checked={checked.includes(optValue)}
+                    onCheckedChange={() => onToggleCheckbox(optValue)}
+                  />
+                  <Label htmlFor={`${field.name}-${optValue}`} className="font-normal">
+                    {optLabel}
+                  </Label>
+                </div>
+              )
+            })}
           </div>
         )
       }
