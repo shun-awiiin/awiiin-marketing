@@ -43,7 +43,7 @@ export default function PublicFormPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/forms/${slug}/submit`, { method: "OPTIONS" })
+        const res = await fetch(`/api/forms/public/${slug}/submit`, { method: "OPTIONS" })
         if (res.status === 405 || res.status === 404) {
           // OPTIONS not supported, try fetching form data via a GET-like approach
           // The form data is fetched from the public slug endpoint
@@ -120,7 +120,7 @@ export default function PublicFormPage() {
       }
 
       try {
-        const res = await fetch(`/api/forms/${slug}/submit`, {
+        const res = await fetch(`/api/forms/public/${slug}/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
