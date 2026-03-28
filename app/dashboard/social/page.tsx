@@ -9,7 +9,7 @@ import { Plus, Share2, Calendar, BarChart3, ShoppingBag } from "lucide-react"
 import { AccountList } from "@/components/social/account-list"
 
 export const metadata = {
-  title: "SNS投稿 | MailFlow",
+  title: "SNS投稿 | Awiiin Marketing",
   description: "SNS投稿管理ダッシュボード",
 }
 

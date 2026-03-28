@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'MailFlow - メール配信管理',
-  description: '到達率最優先のシンプルなメール配信管理ツール',
+  title: 'Awiiin Marketing - マーケティングツール',
+  description: 'Awiiinの統合マーケティングツール',
   generator: 'v0.app',
   icons: {
     icon: [

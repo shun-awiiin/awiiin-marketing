@@ -8,7 +8,7 @@ import { Plus, ArrowLeft } from "lucide-react"
 import { AccountList } from "@/components/social/account-list"
 
 export const metadata = {
-  title: "アカウント管理 | SNS投稿 | MailFlow",
+  title: "アカウント管理 | SNS投稿 | Awiiin Marketing",
   description: "SNSアカウント管理",
 }
 

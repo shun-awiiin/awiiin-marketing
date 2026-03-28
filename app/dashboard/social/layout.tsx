@@ -2,8 +2,8 @@ import { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | SNS投稿 | MailFlow",
-    default: "SNS投稿 | MailFlow",
+    template: "%s | SNS投稿 | Awiiin Marketing",
+    default: "SNS投稿 | Awiiin Marketing",
   },
   description: "SNS投稿管理",
 }

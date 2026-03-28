@@ -43,7 +43,7 @@ async function sendAutoReply(
     to: recipientEmail,
     subject: settings.autoReplySubject,
     text: body,
-    fromName: 'MailFlow',
+    fromName: 'Awiiin Marketing',
     fromEmail: formOwnerEmail,
   })
 }

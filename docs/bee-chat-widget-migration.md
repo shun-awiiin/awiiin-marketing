@@ -2,7 +2,7 @@
 
 ## 概要
 
-現在 Bee（shipping-agency）に導入されている **HubSpot チャットウィジェット** を、自社開発の **MailFlow チャットウィジェット** に置き換える手順です。
+現在 Bee（shipping-agency）に導入されている **HubSpot チャットウィジェット** を、自社開発の **Awiiin Marketing チャットウィジェット** に置き換える手順です。
 
 変更量は最小限（HTML 2行の差し替え）で完了します。
 
@@ -20,26 +20,26 @@
 
 ---
 
-## 新しい実装（MailFlow チャットウィジェット）
+## 新しい実装（Awiiin Marketing チャットウィジェット）
 
 ### 置き換えるコード
 
 上記の HubSpot コードを **削除** し、以下に **置き換えて** ください：
 
 ```html
-<!-- Start of MailFlow Chat Widget -->
+<!-- Start of Awiiin Marketing Chat Widget -->
 <script
-  src="https://YOUR_MAILFLOW_DOMAIN/chat-widget.js"
+  src="https://marketing.awiiin.com/chat-widget.js"
   data-widget-id="c0fa5216-6a6d-46fd-bfbe-464d26b2f307"
   data-position="bottom-right"
   data-color="#F8A826"
   async
   defer
 ></script>
-<!-- End of MailFlow Chat Widget -->
+<!-- End of Awiiin Marketing Chat Widget -->
 ```
 
-> **注意:** `YOUR_MAILFLOW_DOMAIN` は MailFlow アプリのデプロイ先ドメインに置き換えてください。
+> **注意:** `marketing.awiiin.com` は Awiiin Marketing アプリのデプロイ先ドメインに置き換えてください。
 > ローカル開発時は `http://localhost:3000` を使用します。
 
 ### ローカル開発用（テスト確認用）
@@ -61,7 +61,7 @@
 
 | ファイル | 変更内容 |
 |---|---|
-| `app/index.html` | HubSpot スクリプト → MailFlow スクリプトに差し替え |
+| `app/index.html` | HubSpot スクリプト → Awiiin Marketing スクリプトに差し替え |
 | `app/dist/index.html` | 同上（ビルド時に自動反映される場合は不要） |
 
 ---
@@ -81,16 +81,16 @@
 ### Step 2: 上記を以下に置き換える
 
 ```html
-<!-- Start of MailFlow Chat Widget -->
+<!-- Start of Awiiin Marketing Chat Widget -->
 <script
-  src="https://YOUR_MAILFLOW_DOMAIN/chat-widget.js"
+  src="https://marketing.awiiin.com/chat-widget.js"
   data-widget-id="c0fa5216-6a6d-46fd-bfbe-464d26b2f307"
   data-position="bottom-right"
   data-color="#F8A826"
   async
   defer
 ></script>
-<!-- End of MailFlow Chat Widget -->
+<!-- End of Awiiin Marketing Chat Widget -->
 ```
 
 ### Step 3: 動作確認
@@ -100,9 +100,9 @@
 3. アイコンをクリックしてチャットパネルが開くことを確認
 4. メールアドレスと名前を入力してメッセージ送信できることを確認
 
-### Step 4: MailFlow ダッシュボードで受信確認
+### Step 4: Awiiin Marketing ダッシュボードで受信確認
 
-- MailFlow の `/dashboard/chat` でメッセージが受信されていることを確認
+- Awiiin Marketing の `/dashboard/chat` でメッセージが受信されていることを確認
 - 送信者のメールアドレスが `/dashboard/contacts` に自動登録されていることを確認
 
 ---
@@ -119,13 +119,13 @@
 
 ## HubSpot との機能比較
 
-| 機能 | HubSpot | MailFlow |
+| 機能 | HubSpot | Awiiin Marketing |
 |---|---|---|
 | リアルタイムチャット | あり | あり |
 | 訪問者のメール取得 | あり | あり（必須設定可能） |
-| コンタクト自動登録 | HubSpot CRM | MailFlow コンタクトリスト |
-| チャット履歴 | HubSpot 管理画面 | MailFlow `/dashboard/chat` |
-| タイムライン紐付け | HubSpot CRM | MailFlow コンタクト詳細 |
+| コンタクト自動登録 | HubSpot CRM | Awiiin Marketing コンタクトリスト |
+| チャット履歴 | HubSpot 管理画面 | Awiiin Marketing `/dashboard/chat` |
+| タイムライン紐付け | HubSpot CRM | Awiiin Marketing コンタクト詳細 |
 | 自社管理 | 不可（外部サービス） | 完全自社管理 |
 | 月額費用 | HubSpot 料金 | なし（自社インフラ） |
 
@@ -133,6 +133,6 @@
 
 ## 注意事項
 
-- HubSpot のスクリプトを残したまま MailFlow のスクリプトを追加すると、チャットアイコンが2つ表示されます。必ず HubSpot 側を **削除** してから置き換えてください。
+- HubSpot のスクリプトを残したまま Awiiin Marketing のスクリプトを追加すると、チャットアイコンが2つ表示されます。必ず HubSpot 側を **削除** してから置き換えてください。
 - `chat-widget.js` は外部依存なし（バニラ JS）のため、Vue.js との競合はありません。
-- ウィジェットの色・挨拶メッセージ等の変更は MailFlow の `/dashboard/chat/settings` から行えます。
+- ウィジェットの色・挨拶メッセージ等の変更は Awiiin Marketing の `/dashboard/chat/settings` から行えます。

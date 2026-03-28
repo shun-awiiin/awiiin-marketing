@@ -196,7 +196,7 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                   <Mail className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">MailFlow</span>
+                  <span className="font-semibold">Awiiin Marketing</span>
                   <span className="text-xs text-muted-foreground">
                     メール配信管理
                   </span>

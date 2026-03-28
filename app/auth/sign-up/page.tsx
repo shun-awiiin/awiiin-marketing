@@ -92,7 +92,7 @@ export default function SignUpPage() {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Mail className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">MailFlow</span>
+            <span className="text-2xl font-bold">Awiiin Marketing</span>
           </div>
           <CardTitle className="text-xl">新規登録</CardTitle>
           <CardDescription>
