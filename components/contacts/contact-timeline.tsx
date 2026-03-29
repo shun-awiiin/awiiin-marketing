@@ -20,6 +20,8 @@ import {
   UserPlus,
   Loader2,
   Filter,
+  CalendarCheck,
+  CalendarClock,
 } from 'lucide-react'
 
 // ============================================
@@ -45,6 +47,8 @@ const ACTIVITY_CONFIG: Record<ActivityType, ActivityConfig> = {
   scenario_enrolled: { icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100' },
   note_added: { icon: StickyNote, color: 'text-slate-600', bgColor: 'bg-slate-100' },
   contact_created: { icon: UserPlus, color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  meeting_scheduled: { icon: CalendarClock, color: 'text-teal-600', bgColor: 'bg-teal-100' },
+  meeting_completed: { icon: CalendarCheck, color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
 }
 
 // ============================================
@@ -64,6 +68,8 @@ const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   scenario_enrolled: 'シナリオ登録',
   note_added: 'ノート追加',
   contact_created: 'コンタクト作成',
+  meeting_scheduled: 'ミーティング予定',
+  meeting_completed: 'ミーティング完了',
 }
 
 // ============================================

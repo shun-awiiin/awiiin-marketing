@@ -46,7 +46,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/unsubscribe') ||
     request.nextUrl.pathname.startsWith('/api/webhooks') ||
     request.nextUrl.pathname.startsWith('/api/forms/public') ||
-    request.nextUrl.pathname.startsWith('/api/chat/public')
+    request.nextUrl.pathname.startsWith('/api/chat/public') ||
+    request.nextUrl.pathname.startsWith('/api/calendar/callback')
 
   if (!user && !isPublicPath) {
     // no user, redirect to login page

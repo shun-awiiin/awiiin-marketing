@@ -17,6 +17,8 @@ export type ActivityType =
   | 'scenario_enrolled'
   | 'note_added'
   | 'contact_created'
+  | 'meeting_scheduled'
+  | 'meeting_completed'
 
 // ============================================
 // TABLE TYPES
