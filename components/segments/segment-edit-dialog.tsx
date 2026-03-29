@@ -17,6 +17,7 @@ import { Users, Loader2 } from 'lucide-react'
 import { SegmentBuilder } from './segment-builder'
 import { useSegmentPreview } from '@/lib/hooks/use-segment-preview'
 import type { Segment, SegmentRules } from '@/lib/types/l-step'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Props {
   segment: Segment
@@ -35,6 +36,7 @@ export function SegmentEditDialog({
   onClose,
   onSave
 }: Props) {
+  const orgFetch = useOrgFetch();
   const [name, setName] = useState(segment.name)
   const [description, setDescription] = useState(segment.description || '')
   const [rules, setRules] = useState<SegmentRules>(segment.rules)
@@ -62,7 +64,7 @@ export function SegmentEditDialog({
     setError(null)
 
     try {
-      const response = await fetch(`/api/segments/${segment.id}`, {
+      const response = await orgFetch(`/api/segments/${segment.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

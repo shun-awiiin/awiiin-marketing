@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 
 // GET /api/tags - List all tags
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    // Get tags with contact count
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
+
     const { data: tags, error } = await supabase
       .from('tags')
       .select('*')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .order('name');
 
     if (error) {
@@ -38,8 +40,7 @@ export async function GET() {
     );
 
     return NextResponse.json({ data: tagsWithCounts });
-  } catch (error) {
-    console.error('Tags fetch error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -47,12 +48,14 @@ export async function GET() {
 // POST /api/tags - Create tag
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
+
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const body = await request.json();
     const { name, color } = body;
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await supabase
       .from('tags')
       .select('id')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .eq('name', name)
       .single();
 
@@ -76,7 +79,8 @@ export async function POST(request: NextRequest) {
     const { data: tag, error } = await supabase
       .from('tags')
       .insert({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         name,
         color: color || '#6B7280'
       })
@@ -88,8 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ data: { ...tag, contact_count: 0 } }, { status: 201 });
-  } catch (error) {
-    console.error('Create tag error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -55,6 +55,7 @@ import {
   generateSubject,
   buildContext,
 } from "@/lib/email/template-renderer";
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface SegmentOption {
   id: string;
@@ -114,6 +115,7 @@ export function CampaignWizard({
   totalActiveContacts,
   userId,
 }: CampaignWizardProps) {
+  const orgFetch = useOrgFetch();
   const [currentStep, setCurrentStep] = useState<Step>("type");
   const [campaignData, setCampaignData] = useState({
     name: "",
@@ -1174,7 +1176,7 @@ export function CampaignWizard({
                           setTestSending(true);
                           setTestResult(null);
                           try {
-                            const res = await fetch('/api/email/test', {
+                            const res = await orgFetch('/api/email/test', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({

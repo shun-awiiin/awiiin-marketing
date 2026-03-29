@@ -42,54 +42,51 @@ import {
   Users,
   BarChart3,
   GraduationCap,
-  ListIcon,
+  Building2,
+  ContactRound,
+  FormInput,
+  MessagesSquare,
+  CalendarDays,
 } from "lucide-react";
 import { XIcon } from "@/components/icons/x-icon";
+import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 
-const funnelMenuItems = [
+const crmMenuItems = [
   {
-    title: "LP",
-    icon: FileText,
-    href: "/dashboard/lp",
-    matchPaths: ["/dashboard/lp"],
-    description: "ランディングページ",
+    title: "コンタクト",
+    icon: ContactRound,
+    href: "/dashboard/contacts",
+    matchPaths: ["/dashboard/contacts"],
   },
   {
-    title: "決済",
-    icon: CreditCard,
-    href: "/dashboard/payment",
-    matchPaths: ["/dashboard/payment"],
-    description: "商品・決済管理",
+    title: "フォーム",
+    icon: FormInput,
+    href: "/dashboard/forms",
+    matchPaths: ["/dashboard/forms"],
   },
   {
-    title: "サンクス",
-    icon: Heart,
-    href: "/dashboard/thank-you",
-    matchPaths: ["/dashboard/thank-you"],
-    description: "サンクスページ",
+    title: "チャット",
+    icon: MessagesSquare,
+    href: "/dashboard/chat",
+    matchPaths: ["/dashboard/chat"],
   },
   {
-    title: "配信",
-    icon: Send,
-    href: "/dashboard/delivery",
-    matchPaths: ["/dashboard/delivery", "/dashboard/campaigns", "/dashboard/scenarios"],
-    description: "メール・LINE配信",
-  },
-  {
-    title: "紹介",
-    icon: Users,
-    href: "/dashboard/referral",
-    matchPaths: ["/dashboard/referral"],
-    description: "アフィリエイト",
-  },
-  {
-    title: "結果",
-    icon: BarChart3,
-    href: "/dashboard/results",
-    matchPaths: ["/dashboard/results"],
-    description: "コンバージョン分析",
+    title: "カレンダー",
+    icon: CalendarDays,
+    href: "/dashboard/calendar",
+    matchPaths: ["/dashboard/calendar"],
   },
 ];
+
+// ファネルセクションは現在非表示（将来使用時にコメント解除）
+// const funnelMenuItems = [
+//   { title: "LP", icon: FileText, href: "/dashboard/lp", matchPaths: ["/dashboard/lp"] },
+//   { title: "決済", icon: CreditCard, href: "/dashboard/payment", matchPaths: ["/dashboard/payment"] },
+//   { title: "サンクス", icon: Heart, href: "/dashboard/thank-you", matchPaths: ["/dashboard/thank-you"] },
+//   { title: "配信", icon: Send, href: "/dashboard/delivery", matchPaths: ["/dashboard/delivery", "/dashboard/campaigns", "/dashboard/scenarios"] },
+//   { title: "紹介", icon: Users, href: "/dashboard/referral", matchPaths: ["/dashboard/referral"] },
+//   { title: "結果", icon: BarChart3, href: "/dashboard/results", matchPaths: ["/dashboard/results"] },
+// ];
 
 const contentMenuItems = [
   {
@@ -172,11 +169,13 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
 
     return {
       channels: channelMenuItems.map((item) => checkActive(item.matchPaths)),
-      funnels: funnelMenuItems.map((item) => checkActive(item.matchPaths)),
+      crm: crmMenuItems.map((item) => checkActive(item.matchPaths)),
       contents: contentMenuItems.map((item) => checkActive(item.matchPaths)),
       settings: {
+        chatWidget: pathname.startsWith("/dashboard/chat/settings"),
         line: pathname === "/dashboard/settings/line",
         dns: pathname === "/dashboard/settings/dns",
+        organization: pathname.startsWith("/dashboard/settings/organization"),
         main: pathname === "/dashboard/settings",
       },
     };
@@ -190,19 +189,7 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Mail className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Awiiin Marketing</span>
-                  <span className="text-xs text-muted-foreground">
-                    メール配信管理
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
+            <OrgSwitcher />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -227,12 +214,12 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>ファネル</SidebarGroupLabel>
+          <SidebarGroupLabel>CRM</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {funnelMenuItems.map((item, index) => (
+              {crmMenuItems.map((item, index) => (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={activeStates.funnels[index]}>
+                  <SidebarMenuButton asChild isActive={activeStates.crm[index]}>
                     <Link href={item.href} prefetch={true}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
@@ -269,6 +256,17 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
+                  isActive={activeStates.settings.chatWidget}
+                >
+                  <Link href="/dashboard/chat/settings" prefetch={true}>
+                    <MessagesSquare className="size-4" />
+                    <span>チャットウィジェット</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
                   isActive={activeStates.settings.line}
                 >
                   <Link href="/dashboard/settings/line" prefetch={true}>
@@ -285,6 +283,17 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                   <Link href="/dashboard/settings/dns" prefetch={true}>
                     <Shield className="size-4" />
                     <span>DNS設定</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={activeStates.settings.organization}
+                >
+                  <Link href="/dashboard/settings/organization" prefetch={true}>
+                    <Building2 className="size-4" />
+                    <span>組織設定</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

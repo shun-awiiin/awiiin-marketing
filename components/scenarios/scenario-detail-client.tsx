@@ -22,6 +22,7 @@ import {
 import { StepBuilder } from './step-builder'
 import { EnrollmentList } from './enrollment-list'
 import type { ScenarioWithSteps, ScenarioStep, ScenarioStatus } from '@/lib/types/l-step'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Props {
   scenario: ScenarioWithSteps & {
@@ -53,6 +54,7 @@ const stepTypeIcons: Record<string, React.ReactNode> = {
 }
 
 export function ScenarioDetailClient({ scenario: initialScenario, tags, customFields }: Props) {
+  const orgFetch = useOrgFetch();
   const router = useRouter()
   const [scenario, setScenario] = useState(initialScenario)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -65,7 +67,7 @@ export function ScenarioDetailClient({ scenario: initialScenario, tags, customFi
 
     setIsUpdating(true)
     try {
-      const response = await fetch(`/api/scenarios/${scenario.id}`, {
+      const response = await orgFetch(`/api/scenarios/${scenario.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

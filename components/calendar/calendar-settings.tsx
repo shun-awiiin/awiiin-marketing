@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import type { CalendarConnectionStatus } from '@/lib/types/calendar'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 // ============================================
 // TYPES
@@ -38,6 +39,7 @@ export function CalendarSettings({
   successMessage,
   errorMessage,
 }: CalendarSettingsProps) {
+  const orgFetch = useOrgFetch();
   const [status, setStatus] = useState<CalendarConnectionStatus | null>(
     initialStatus || null
   )
@@ -48,7 +50,7 @@ export function CalendarSettings({
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/calendar/connection')
+      const res = await orgFetch('/api/calendar/connection')
       if (res.ok) {
         const data = await res.json()
         setStatus(data)
@@ -73,7 +75,7 @@ export function CalendarSettings({
   const handleDisconnect = async () => {
     setDisconnecting(true)
     try {
-      const res = await fetch('/api/calendar/connection', { method: 'DELETE' })
+      const res = await orgFetch('/api/calendar/connection', { method: 'DELETE' })
       if (res.ok) {
         setStatus({
           connected: false,
@@ -94,7 +96,7 @@ export function CalendarSettings({
     if (!status) return
 
     try {
-      const res = await fetch('/api/calendar/connection', {
+      const res = await orgFetch('/api/calendar/connection', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,7 +116,7 @@ export function CalendarSettings({
     setSyncing(true)
     setSyncResult(null)
     try {
-      const res = await fetch('/api/calendar/sync', {
+      const res = await orgFetch('/api/calendar/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: false }),

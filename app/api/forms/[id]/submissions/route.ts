@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -7,19 +8,21 @@ type RouteParams = { params: Promise<{ id: string }> }
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     // Verify form ownership
     const { data: form } = await supabase
       .from('standalone_forms')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!form) {

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import { ImportSettings, useImportSettings } from "./import-settings";
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface CSVImportDialogProps {
   userId: string;
@@ -37,6 +38,7 @@ export function CSVImportDialog({
   onComplete,
   onClose,
 }: CSVImportDialogProps) {
+  const orgFetch = useOrgFetch();
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<string[][] | null>(null);
   const [previewCount, setPreviewCount] = useState(0);
@@ -240,7 +242,7 @@ export function CSVImportDialog({
           formData.append("new_list_name", importSettings.newListName);
         }
 
-        const response = await fetch("/api/contacts/import", {
+        const response = await orgFetch("/api/contacts/import", {
           method: "POST",
           body: formData,
         });

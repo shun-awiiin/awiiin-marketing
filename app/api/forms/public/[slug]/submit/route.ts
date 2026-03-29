@@ -30,6 +30,49 @@ function extractEmail(data: Record<string, unknown>): string | null {
   return null
 }
 
+async function sendNotification(
+  notifyEmails: string,
+  formName: string,
+  formData: Record<string, unknown>,
+  fromEmail: string
+): Promise<void> {
+  if (!notifyEmails) return
+
+  const addresses = notifyEmails
+    .split(',')
+    .map((e) => e.trim())
+    .filter((e) => e.includes('@'))
+
+  if (addresses.length === 0) return
+
+  const dataLines = Object.entries(formData)
+    .map(([key, value]) => `${key}: ${String(value || '')}`)
+    .join('\n')
+
+  const subject = `【フォーム送信通知】${formName}`
+  const text = [
+    `「${formName}」にフォーム送信がありました。`,
+    '',
+    '--- 送信内容 ---',
+    dataLines,
+    '',
+    '---',
+    'Awiiin Marketing',
+  ].join('\n')
+
+  await Promise.allSettled(
+    addresses.map((to) =>
+      sendEmail({
+        to,
+        subject,
+        text,
+        fromName: 'Awiiin Marketing',
+        fromEmail,
+      })
+    )
+  )
+}
+
 async function sendAutoReply(
   settings: FormSettings,
   recipientEmail: string,
@@ -187,6 +230,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (recipientEmail) {
       postProcessing.push(sendAutoReply(settings, recipientEmail, ownerEmail))
+    }
+
+    if (settings.notifyEmail) {
+      postProcessing.push(
+        sendNotification(settings.notifyEmail, form.name, formData, ownerEmail)
+      )
     }
 
     if (contactId && settings.tagIds.length > 0) {

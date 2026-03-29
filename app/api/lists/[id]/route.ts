@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { z } from 'zod'
 
 const updateListSchema = z.object({
@@ -15,18 +16,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { data: list, error } = await supabase
       .from('lists')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (error || !list) {
@@ -46,12 +49,14 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const validation = updateListSchema.safeParse(body)
@@ -63,12 +68,11 @@ export async function PATCH(
       }, { status: 400 })
     }
 
-    // Verify ownership
     const { data: existing } = await supabase
       .from('lists')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!existing) {
@@ -77,12 +81,11 @@ export async function PATCH(
 
     const { name, description, color } = validation.data
 
-    // Check for duplicate name
     if (name) {
       const { data: duplicate } = await supabase
         .from('lists')
         .select('id')
-        .eq('user_id', user.id)
+        .eq(filterCol, filterVal)
         .eq('name', name)
         .neq('id', id)
         .single()
@@ -124,18 +127,20 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { error } = await supabase
       .from('lists')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })

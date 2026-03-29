@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Plus, MoreHorizontal, Trash2, Users, ListIcon, Pencil, Eye } from 'lucide-react'
 import { ListDetailDialog } from './list-detail-dialog'
 import type { List } from '@/lib/types/list'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 const PRESET_COLORS = [
   '#6B7280', '#EF4444', '#F97316', '#EAB308',
@@ -42,6 +43,7 @@ interface Props {
 }
 
 export function ListsClient({ lists: initialLists }: Props) {
+  const orgFetch = useOrgFetch();
   const [lists, setLists] = useState(initialLists)
   const [isCreating, setIsCreating] = useState(false)
   const [newList, setNewList] = useState({ name: '', description: '', color: '#6B7280' })
@@ -59,7 +61,7 @@ export function ListsClient({ lists: initialLists }: Props) {
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/lists', {
+      const response = await orgFetch('/api/lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newList)
@@ -86,7 +88,7 @@ export function ListsClient({ lists: initialLists }: Props) {
 
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/lists/${editingList.id}`, {
+      const response = await orgFetch(`/api/lists/${editingList.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +118,7 @@ export function ListsClient({ lists: initialLists }: Props) {
     if (!confirm('このリストを削除しますか？\nリスト内のコンタクトは削除されません。')) return
 
     try {
-      const response = await fetch(`/api/lists/${id}`, { method: 'DELETE' })
+      const response = await orgFetch(`/api/lists/${id}`, { method: 'DELETE' })
       const result = await response.json()
 
       if (result.success) {

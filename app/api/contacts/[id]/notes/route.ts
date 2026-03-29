@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { CreateNoteSchema, UpdateNoteSchema } from '@/lib/types/timeline'
 
 // GET /api/contacts/:id/notes - List notes for contact
@@ -9,19 +10,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     // Verify ownership
     const { data: contact } = await supabase
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!contact) {
@@ -32,11 +35,9 @@ export async function GET(
       .from('contact_notes')
       .select('*', { count: 'exact' })
       .eq('contact_id', id)
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Notes fetch error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -44,8 +45,7 @@ export async function GET(
       data: notes || [],
       meta: { total: count || 0 },
     })
-  } catch (error) {
-    console.error('Notes GET error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -57,26 +57,27 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     // Verify ownership
     const { data: contact } = await supabase
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!contact) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    // Validate body
     const body = await request.json()
     const parsed = CreateNoteSchema.safeParse(body)
 
@@ -87,28 +88,28 @@ export async function POST(
       )
     }
 
-    // Insert note
     const { data: note, error: noteError } = await supabase
       .from('contact_notes')
       .insert({
         contact_id: id,
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         content: parsed.data.content,
       })
       .select()
       .single()
 
     if (noteError) {
-      console.error('Note create error:', noteError)
       return NextResponse.json({ error: noteError.message }, { status: 500 })
     }
 
     // Create corresponding activity
-    const { error: activityError } = await supabase
+    await supabase
       .from('contact_activities')
       .insert({
         contact_id: id,
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         activity_type: 'note_added',
         title: 'ノートを追加',
         description: parsed.data.content.slice(0, 200),
@@ -118,14 +119,8 @@ export async function POST(
         occurred_at: new Date().toISOString(),
       })
 
-    if (activityError) {
-      console.error('Activity create error:', activityError)
-      // Note was created successfully, don't fail the request
-    }
-
     return NextResponse.json({ data: note }, { status: 201 })
-  } catch (error) {
-    console.error('Notes POST error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -137,12 +132,14 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const noteId = body.note_id
@@ -163,7 +160,7 @@ export async function PATCH(
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!contact) {
@@ -175,12 +172,10 @@ export async function PATCH(
       .update({ content: parsed.data.content, updated_at: new Date().toISOString() })
       .eq('id', noteId)
       .eq('contact_id', id)
-      .eq('user_id', user.id)
       .select()
       .single()
 
     if (noteError) {
-      console.error('Note update error:', noteError)
       return NextResponse.json({ error: noteError.message }, { status: 500 })
     }
 
@@ -189,8 +184,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data: note })
-  } catch (error) {
-    console.error('Notes PATCH error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -202,12 +196,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const noteId = body.note_id
@@ -220,7 +216,7 @@ export async function DELETE(
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!contact) {
@@ -232,10 +228,8 @@ export async function DELETE(
       .delete()
       .eq('id', noteId)
       .eq('contact_id', id)
-      .eq('user_id', user.id)
 
     if (deleteError) {
-      console.error('Note delete error:', deleteError)
       return NextResponse.json({ error: deleteError.message }, { status: 500 })
     }
 
@@ -245,11 +239,9 @@ export async function DELETE(
       .delete()
       .eq('reference_type', 'contact_notes')
       .eq('reference_id', noteId)
-      .eq('user_id', user.id)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Notes DELETE error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -4,19 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { syncCalendarEvents } from '@/lib/calendar/calendar-sync'
 import { CalendarSyncQuerySchema } from '@/lib/types/calendar'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+  const ctx = await getOrgContext(request)
+  if (isOrgContextError(ctx)) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
   }
+
+  const supabase = await createServiceClient()
 
   // Parse query params
   let force = false
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
   const { data: connection } = await supabase
     .from('calendar_connections')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', ctx.user.id)
     .single()
 
   if (!connection) {

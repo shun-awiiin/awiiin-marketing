@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Plus, MoreHorizontal, Play, Pause, Trash2, GitBranch, Users } from 'lucide-react'
 import type { ScenarioStatus } from '@/lib/types/l-step'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface ScenarioWithStats {
   id: string
@@ -64,11 +65,12 @@ const triggerLabels: Record<string, string> = {
 }
 
 export function ScenariosClient({ scenarios: initialScenarios }: Props) {
+  const orgFetch = useOrgFetch();
   const [scenarios, setScenarios] = useState(initialScenarios)
 
   const handleStatusChange = async (id: string, newStatus: ScenarioStatus) => {
     try {
-      const response = await fetch(`/api/scenarios/${id}`, {
+      const response = await orgFetch(`/api/scenarios/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -90,7 +92,7 @@ export function ScenariosClient({ scenarios: initialScenarios }: Props) {
     if (!confirm('このシナリオを削除しますか?')) return
 
     try {
-      const response = await fetch(`/api/scenarios/${id}`, {
+      const response = await orgFetch(`/api/scenarios/${id}`, {
         method: 'DELETE'
       })
 

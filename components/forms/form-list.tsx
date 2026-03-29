@@ -32,6 +32,7 @@ import {
 import { MoreHorizontal, Pencil, Trash2, ClipboardList, Code } from "lucide-react"
 import type { StandaloneForm } from "@/lib/types/forms"
 import { FormEmbedDialog } from "./form-embed-dialog"
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
   draft: { label: "下書き", variant: "secondary" },
@@ -44,6 +45,7 @@ interface FormListProps {
 }
 
 export function FormList({ forms: initialForms }: FormListProps) {
+  const orgFetch = useOrgFetch();
   const router = useRouter()
   const [forms, setForms] = useState(initialForms)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -52,7 +54,7 @@ export function FormList({ forms: initialForms }: FormListProps) {
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return
 
-    const res = await fetch(`/api/forms/${deleteTarget}`, { method: "DELETE" })
+    const res = await orgFetch(`/api/forms/${deleteTarget}`, { method: "DELETE" })
     if (res.ok) {
       setForms((prev) => prev.filter((f) => f.id !== deleteTarget))
     }

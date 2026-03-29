@@ -33,6 +33,7 @@ import { SegmentBuilder } from './segment-builder'
 import { SegmentDetailDialog } from './segment-detail-dialog'
 import { SegmentEditDialog } from './segment-edit-dialog'
 import type { Segment, SegmentRules } from '@/lib/types/l-step'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Props {
   segments: Segment[]
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export function SegmentsClient({ segments: initialSegments, tags, customFields }: Props) {
+  const orgFetch = useOrgFetch();
   const [segments, setSegments] = useState(initialSegments)
   const [isCreating, setIsCreating] = useState(false)
   const [newSegment, setNewSegment] = useState({
@@ -61,7 +63,7 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/segments', {
+      const response = await orgFetch('/api/segments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSegment)
@@ -91,7 +93,7 @@ export function SegmentsClient({ segments: initialSegments, tags, customFields }
     if (!confirm('このセグメントを削除しますか?')) return
 
     try {
-      const response = await fetch(`/api/segments/${id}`, {
+      const response = await orgFetch(`/api/segments/${id}`, {
         method: 'DELETE'
       })
 

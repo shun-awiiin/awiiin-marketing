@@ -6,17 +6,19 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { ChatWidgetSettings } from "./chat-widget-settings"
 import type { ChatWidget } from "@/lib/types/chat"
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface ChatSettingsPageProps {
   initialWidgets: ChatWidget[]
 }
 
 export function ChatSettingsPage({ initialWidgets }: ChatSettingsPageProps) {
+  const orgFetch = useOrgFetch();
   const [widgets, setWidgets] = useState<ChatWidget[]>(initialWidgets)
 
   const handleRefresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/chat/widgets")
+      const res = await orgFetch("/api/chat/widgets")
       if (res.ok) {
         const json = await res.json()
         setWidgets(json.data ?? [])

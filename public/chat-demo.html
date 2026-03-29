@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Widget Demo - Bee Marketing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo { font-size: 20px; font-weight: 700; color: #F8A826; }
+    .logo span { color: #1e293b; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { text-decoration: none; color: #64748b; font-size: 14px; }
+    .nav-links a:hover { color: #1e293b; }
+    .hero {
+      max-width: 800px;
+      margin: 80px auto;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .hero h1 { font-size: 42px; font-weight: 700; margin-bottom: 16px; line-height: 1.2; }
+    .hero h1 em { font-style: normal; color: #F8A826; }
+    .hero p { font-size: 18px; color: #64748b; line-height: 1.7; max-width: 600px; margin: 0 auto 32px; }
+    .cta { display: inline-block; background: #F8A826; color: #fff; padding: 14px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; }
+    .cta:hover { background: #e69a1e; }
+    .features {
+      max-width: 900px;
+      margin: 60px auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      padding: 0 24px;
+    }
+    .feature {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      border: 1px solid #e2e8f0;
+    }
+    .feature h3 { font-size: 16px; margin-bottom: 8px; }
+    .feature p { font-size: 14px; color: #64748b; line-height: 1.6; }
+    .demo-note {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 10px;
+      padding: 16px 24px;
+      text-align: center;
+      font-size: 14px;
+      color: #92400e;
+    }
+    footer {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 28px; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">Bee <span>Marketing</span></div>
+    <div class="nav-links">
+      <a href="#">Features</a>
+      <a href="#">Pricing</a>
+      <a href="#">Blog</a>
+      <a href="#">Contact</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>eBay selling made <em>effortless</em></h1>
+    <p>AI-powered marketing and customer support tools for eBay sellers. Automate translations, manage customer inquiries, and grow your international business.</p>
+    <a href="#" class="cta">Get Started Free</a>
+  </div>
+
+  <div class="demo-note">
+    This is a demo page. Click the chat icon in the bottom-right corner to test the chat widget.
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <h3>AI Translation</h3>
+      <p>Automatically translate listings and customer messages with AI-powered accuracy.</p>
+    </div>
+    <div class="feature">
+      <h3>Auto Reply</h3>
+      <p>Smart customer response automation that handles inquiries 24/7.</p>
+    </div>
+    <div class="feature">
+      <h3>Analytics</h3>
+      <p>Track performance, customer satisfaction, and sales growth in real-time.</p>
+    </div>
+  </div>
+
+  <footer>Bee Marketing Demo Page</footer>
+
+  <!-- Awiiin Marketing Chat Widget -->
+  <script
+    src="https://marketing.awiiin.com/chat-widget.js"
+    data-widget-id="fa59ca0b-fcf0-47f2-9de2-2a92c6b78b5d"
+    data-position="bottom-right"
+    data-color="#F8A826"
+    data-name="Bee Support"
+    data-welcome="Welcome to Bee Support! We're here to help you with any questions about our eBay marketing tools.
+
+Business hours: 10:00 - 18:00 JST
+We'll get back to you as soon as possible."
+    data-placeholder="Send a message..."
+    defer
+  ></script>
+</body>
+</html>

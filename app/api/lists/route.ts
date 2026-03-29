@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { z } from 'zod'
 
 const createListSchema = z.object({
@@ -9,32 +10,29 @@ const createListSchema = z.object({
 })
 
 // GET /api/lists - List all lists
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { data: lists, error } = await supabase
       .from('lists')
       .select('*')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .order('created_at', { ascending: false })
 
     if (error) {
-      // Table doesn't exist yet or other schema errors - return empty array
-      // Supabase error codes: 42P01 (table not found), PGRST116 (relation not found)
-      console.error('Lists fetch error:', error.code, error.message)
       return NextResponse.json({ success: true, data: [] })
     }
 
     return NextResponse.json({ success: true, data: lists || [] })
-  } catch (err) {
-    console.error('Lists API error:', err)
-    // Return empty array instead of error for better UX
+  } catch {
     return NextResponse.json({ success: true, data: [] })
   }
 }
@@ -42,12 +40,14 @@ export async function GET() {
 // POST /api/lists - Create list
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const validation = createListSchema.safeParse(body)
@@ -61,11 +61,10 @@ export async function POST(request: NextRequest) {
 
     const { name, description, color } = validation.data
 
-    // Check for duplicate
     const { data: existing } = await supabase
       .from('lists')
       .select('id')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .eq('name', name)
       .single()
 
@@ -79,7 +78,8 @@ export async function POST(request: NextRequest) {
     const { data: list, error } = await supabase
       .from('lists')
       .insert({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         name,
         description: description || null,
         color: color || '#6B7280'

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 import { isValidEmail } from '@/lib/email/template-renderer';
 import { quickValidateEmail } from '@/lib/validation/email-validator';
 
@@ -20,17 +21,14 @@ const PARALLEL_BATCHES = 5;
 // POST /api/contacts/import - Import contacts from CSV
 export async function POST(request: NextRequest) {
   try {
-    // Use regular client for auth verification
-    const authClient = await createClient();
-    const { data: { user } } = await authClient.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    // Use service role client for data operations (bypasses RLS for speed)
-    // Security: user is already verified above, all queries are scoped by user.id
     const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
       const { data: existingContacts } = await supabase
         .from('contacts')
         .select('id, email')
-        .eq('user_id', user.id)
+        .eq(filterCol, filterVal)
         .range(offset, offset + pageSize - 1);
       
       if (!existingContacts || existingContacts.length === 0) break;
@@ -121,7 +119,7 @@ export async function POST(request: NextRequest) {
     const { data: existingTags } = await supabase
       .from('tags')
       .select('id, name')
-      .eq('user_id', user.id);
+      .eq(filterCol, filterVal);
 
     const tagNameToId = new Map(
       existingTags?.map(t => [t.name.toLowerCase(), t.id]) || []
@@ -137,7 +135,8 @@ export async function POST(request: NextRequest) {
       const { data: newTag } = await supabase
         .from('tags')
         .insert({
-          user_id: user.id,
+          user_id: ctx.user.id,
+          organization_id: ctx.orgId,
           name: newTagName.trim(),
           color: newTagColor || getRandomColor()
         })
@@ -156,7 +155,8 @@ export async function POST(request: NextRequest) {
       const { data: newList } = await supabase
         .from('lists')
         .insert({
-          user_id: user.id,
+          user_id: ctx.user.id,
+          organization_id: ctx.orgId,
           name: newListName.trim(),
           color: '#6B7280'
         })
@@ -203,7 +203,8 @@ export async function POST(request: NextRequest) {
     // Pre-create all new tags in batch
     if (allTagNames.size > 0) {
       const tagsToCreate = Array.from(allTagNames).map(name => ({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         name,
         color: getRandomColor()
       }));
@@ -225,6 +226,7 @@ export async function POST(request: NextRequest) {
     // Process rows
     const toInsert: Array<{
       user_id: string;
+      organization_id: string | null;
       email: string;
       first_name: string | null;
       company: string | null;
@@ -322,7 +324,8 @@ export async function POST(request: NextRequest) {
         }
       } else {
         toInsert.push({
-          user_id: user.id,
+          user_id: ctx.user.id,
+          organization_id: ctx.orgId,
           email,
           first_name: firstName,
           company,
@@ -339,7 +342,8 @@ export async function POST(request: NextRequest) {
     const allContacts = [
       ...toInsert,
       ...toUpdate.map(u => ({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         email: Array.from(existingEmailMap.entries()).find(([_, id]) => id === u.id)?.[0] || '',
         first_name: u.first_name,
         company: u.company,

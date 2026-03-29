@@ -5,6 +5,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { EmailTabs } from "@/components/dashboard/email-tabs";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { OrgProviderWrapper } from "@/components/dashboard/org-provider-wrapper";
 
 export default async function DashboardLayout({
   children,
@@ -37,13 +38,15 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
-      <DashboardSidebar user={user} />
-      <SidebarInset>
-        <DashboardHeader />
-        <EmailTabs />
-        <div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <OrgProviderWrapper>
+      <SidebarProvider>
+        <DashboardSidebar user={user} />
+        <SidebarInset>
+          <DashboardHeader />
+          <EmailTabs />
+          <div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </OrgProviderWrapper>
   );
 }

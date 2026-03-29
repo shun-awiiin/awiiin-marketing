@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { z } from 'zod'
 
 const addContactsSchema = z.object({
@@ -17,12 +18,14 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -33,20 +36,18 @@ export async function GET(
       .from('lists')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (listError || !list) {
       return NextResponse.json({ success: false, error: 'リストが見つかりません' }, { status: 404 })
     }
 
-    // Get total count
     const { count: total } = await supabase
       .from('list_contacts')
       .select('*', { count: 'exact', head: true })
       .eq('list_id', id)
 
-    // Get paginated contacts
     const start = (page - 1) * perPage
     const { data: listContacts, error } = await supabase
       .from('list_contacts')
@@ -67,7 +68,6 @@ export async function GET(
       })
     }
 
-    // Get contact details
     const contactIds = listContacts.map(lc => lc.contact_id)
     const { data: contacts } = await supabase
       .from('contacts')
@@ -91,12 +91,14 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const validation = addContactsSchema.safeParse(body)
@@ -108,23 +110,21 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Verify list ownership
     const { data: list, error: listError } = await supabase
       .from('lists')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (listError || !list) {
       return NextResponse.json({ success: false, error: 'リストが見つかりません' }, { status: 404 })
     }
 
-    // Verify contacts belong to user
     const { data: userContacts } = await supabase
       .from('contacts')
       .select('id')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .in('id', validation.data.contact_ids)
 
     const validContactIds = userContacts?.map(c => c.id) || []
@@ -136,7 +136,6 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Insert contacts
     const insertData = validContactIds.map(contactId => ({
       list_id: id,
       contact_id: contactId
@@ -166,12 +165,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const validation = removeContactsSchema.safeParse(body)
@@ -183,12 +184,11 @@ export async function DELETE(
       }, { status: 400 })
     }
 
-    // Verify list ownership
     const { data: list, error: listError } = await supabase
       .from('lists')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (listError || !list) {

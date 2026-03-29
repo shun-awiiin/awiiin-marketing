@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { TimelineQuerySchema } from '@/lib/types/timeline'
 
 // GET /api/contacts/:id/timeline - Fetch combined timeline
@@ -9,19 +10,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     // Verify ownership
     const { data: contact } = await supabase
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!contact) {
@@ -46,12 +49,10 @@ export async function GET(
     const { page, per_page, activity_type } = parsed.data
     const offset = (page - 1) * per_page
 
-    // Build query
     let query = supabase
       .from('contact_activities')
       .select('*', { count: 'exact' })
       .eq('contact_id', id)
-      .eq('user_id', user.id)
       .order('occurred_at', { ascending: false })
       .range(offset, offset + per_page - 1)
 
@@ -62,7 +63,6 @@ export async function GET(
     const { data: activities, count, error } = await query
 
     if (error) {
-      console.error('Timeline fetch error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -77,8 +77,7 @@ export async function GET(
         has_more: offset + per_page < total,
       },
     })
-  } catch (error) {
-    console.error('Timeline API error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

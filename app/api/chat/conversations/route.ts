@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -17,11 +20,11 @@ export async function GET(request: NextRequest) {
     const perPage = parseInt(searchParams.get('per_page') || '20')
     const offset = (page - 1) * perPage
 
-    // Get widget IDs owned by this user
+    // Get widget IDs owned by this org/user
     const { data: widgets } = await supabase
       .from('chat_widgets')
       .select('id')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
 
     if (!widgets || widgets.length === 0) {
       return NextResponse.json({
@@ -54,7 +57,6 @@ export async function GET(request: NextRequest) {
       query = query.eq('widget_id', widgetId)
     }
 
-    // Order messages to get latest
     query = query.order('created_at', {
       referencedTable: 'chat_messages',
       ascending: false,
@@ -66,7 +68,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Transform to include only the last message
     const transformed = (conversations || []).map((conv) => {
       const lastMessage =
         conv.messages && conv.messages.length > 0 ? conv.messages[0] : null

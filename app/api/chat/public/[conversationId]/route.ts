@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const { data: messages, error } = await supabase
       .from('chat_messages')
-      .select('id, role, content, created_at')
+      .select('id, role, content, metadata, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const body = await request.json()
-    const { content } = body
+    const { content, metadata } = body
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return NextResponse.json({ error: 'Message content is required' }, { status: 400 })
@@ -76,14 +76,19 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Conversation is closed' }, { status: 403 })
     }
 
+    const insertData: Record<string, unknown> = {
+      conversation_id: conversationId,
+      role: 'visitor',
+      sender_id: visitorId,
+      content: content.trim(),
+    }
+    if (metadata && typeof metadata === 'object') {
+      insertData.metadata = metadata
+    }
+
     const { data: message, error } = await supabase
       .from('chat_messages')
-      .insert({
-        conversation_id: conversationId,
-        role: 'visitor',
-        sender_id: visitorId,
-        content: content.trim(),
-      })
+      .insert(insertData)
       .select()
       .single()
 

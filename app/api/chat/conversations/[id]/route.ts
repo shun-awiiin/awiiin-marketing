@@ -46,6 +46,55 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 }
 
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+    }
+
+    // Verify ownership through widget
+    const { data: conversation } = await supabase
+      .from('chat_conversations')
+      .select('widget_id')
+      .eq('id', id)
+      .single()
+
+    if (!conversation) {
+      return NextResponse.json({ error: '会話が見つかりません' }, { status: 404 })
+    }
+
+    const { data: widget } = await supabase
+      .from('chat_widgets')
+      .select('id')
+      .eq('id', conversation.widget_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!widget) {
+      return NextResponse.json({ error: '会話が見つかりません' }, { status: 404 })
+    }
+
+    // Delete messages first, then conversation
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('conversation_id', id)
+
+    await supabase
+      .from('chat_conversations')
+      .delete()
+      .eq('id', id)
+
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: '内部エラーが発生しました' }, { status: 500 })
+  }
+}
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params

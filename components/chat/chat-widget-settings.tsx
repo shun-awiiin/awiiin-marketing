@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Plus, Copy, Check, Trash2, Settings2, Code, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import type { ChatWidget } from "@/lib/types/chat"
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface ChatWidgetSettingsProps {
   widgets: ChatWidget[]
@@ -54,6 +55,7 @@ export function ChatWidgetSettings({
   widgets,
   onRefresh,
 }: ChatWidgetSettingsProps) {
+  const orgFetch = useOrgFetch();
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -87,7 +89,7 @@ export function ChatWidgetSettings({
     if (!newName.trim()) return
     setCreating(true)
     try {
-      const res = await fetch("/api/chat/widgets", {
+      const res = await orgFetch("/api/chat/widgets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,7 +141,7 @@ export function ChatWidgetSettings({
     if (!editingId || !editName.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/chat/widgets/${editingId}`, {
+      const res = await orgFetch(`/api/chat/widgets/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -183,7 +185,7 @@ export function ChatWidgetSettings({
   const handleToggleActive = useCallback(
     async (widget: ChatWidget) => {
       try {
-        await fetch(`/api/chat/widgets/${widget.id}`, {
+        await orgFetch(`/api/chat/widgets/${widget.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ is_active: !widget.is_active }),
@@ -199,7 +201,7 @@ export function ChatWidgetSettings({
   const handleDelete = useCallback(
     async (widgetId: string) => {
       try {
-        await fetch(`/api/chat/widgets/${widgetId}`, { method: "DELETE" })
+        await orgFetch(`/api/chat/widgets/${widgetId}`, { method: "DELETE" })
         onRefresh()
       } catch {
         // Network error
@@ -413,6 +415,17 @@ export function ChatWidgetSettings({
                 <code>{generateEmbedCode(widget)}</code>
               </pre>
             </div>
+
+            <Separator />
+
+            {/* Live Preview */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                プレビュー
+              </Label>
+              <WidgetPreview widget={widget} />
+            </div>
           </CardContent>
         </Card>
       ))}
@@ -425,7 +438,7 @@ export function ChatWidgetSettings({
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - includes preview */}
       <Dialog
         open={editingId !== null}
         onOpenChange={(open) => {
@@ -531,6 +544,102 @@ export function ChatWidgetSettings({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function WidgetPreview({ widget }: { widget: ChatWidget }) {
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const color = widget.settings.primaryColor
+
+  return (
+    <div className="relative rounded-lg border bg-gradient-to-br from-slate-800 to-slate-900 p-6" style={{ minHeight: 460 }}>
+      {/* Panel — HubSpot style */}
+      {previewOpen && (
+        <div
+          className="absolute right-6 bottom-20 w-[320px] rounded-2xl bg-white shadow-2xl overflow-hidden"
+          style={{ maxHeight: 400 }}
+        >
+          {/* Header */}
+          <div
+            className="px-4 py-3.5 text-white flex items-center justify-between"
+            style={{ background: color }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white/30 overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.2)" }}
+              >
+                {widget.name.charAt(0)}
+              </div>
+              <div className="text-sm font-semibold">{widget.name}</div>
+            </div>
+            <button
+              className="text-white/70 hover:text-white transition-colors"
+              onClick={() => setPreviewOpen(false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body with welcome bubble */}
+          <div className="bg-[#f5f5f5] p-4" style={{ minHeight: 160 }}>
+            <div className="flex gap-2 items-start">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 border-2 border-white shadow-sm"
+                style={{ background: color }}
+              >
+                {widget.name.charAt(0)}
+              </div>
+              <div className="bg-white rounded-xl rounded-bl-sm px-3 py-2.5 text-xs text-gray-700 leading-relaxed shadow-sm whitespace-pre-wrap max-w-[80%]">
+                {widget.settings.greeting}
+              </div>
+            </div>
+          </div>
+
+          {/* Intro form */}
+          <div className="p-3 bg-white border-t space-y-2">
+            <div className="text-[11px] text-gray-500 font-medium">お問い合わせ内容をご入力ください</div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-semibold mb-0.5">お名前</div>
+              <div className="border rounded-lg px-2.5 py-1.5 text-[11px] text-gray-400 bg-gray-50">山田 太郎</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-semibold mb-0.5">メールアドレス</div>
+              <div className="border rounded-lg px-2.5 py-1.5 text-[11px] text-gray-400 bg-gray-50">you@example.com</div>
+            </div>
+          </div>
+
+          {/* Footer input */}
+          <div className="px-3 py-2.5 border-t bg-white flex gap-2 items-center">
+            <div className="flex-1 border rounded-full px-3 py-2 text-[11px] text-gray-400 bg-gray-50">
+              {widget.settings.placeholder || "何でもご依頼ください..."}
+            </div>
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style={{ background: color }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bubble */}
+      <button
+        className="absolute right-6 bottom-6 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+        style={{ background: color }}
+        onClick={() => setPreviewOpen(!previewOpen)}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      </button>
     </div>
   )
 }

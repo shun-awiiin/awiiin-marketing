@@ -124,9 +124,25 @@ export function ChatMessageThread({
                         : "bg-primary text-primary-foreground"
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap break-words">
-                      {msg.content}
-                    </p>
+                    {msg.metadata?.image_url ? (
+                      <a
+                        href={msg.metadata.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <img
+                          src={msg.metadata.image_url}
+                          alt="Attachment"
+                          className="max-w-full max-h-60 rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {msg.content}
+                      </p>
+                    )}
                     <p
                       className={cn(
                         "text-[10px] mt-1",

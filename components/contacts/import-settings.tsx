@@ -13,6 +13,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import type { List } from '@/lib/types/list'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 const PRESET_COLORS = [
   '#6B7280', '#EF4444', '#F97316', '#EAB308',
@@ -181,6 +182,7 @@ export function ImportSettings({ settings, onChange, tags, lists, isLoading }: P
 }
 
 export function useImportSettings() {
+  const orgFetch = useOrgFetch();
   const [settings, setSettings] = useState<ImportSettingsData>({
     updateExisting: true,
     selectedTagIds: [],
@@ -198,7 +200,7 @@ export function useImportSettings() {
       setIsLoading(true)
       try {
         // Fetch tags
-        const tagsRes = await fetch('/api/tags')
+        const tagsRes = await orgFetch('/api/tags')
         if (tagsRes.ok) {
           const tagsData = await tagsRes.json()
           if (tagsData.data) setTags(tagsData.data)
@@ -206,7 +208,7 @@ export function useImportSettings() {
 
         // Fetch lists separately to handle errors gracefully
         try {
-          const listsRes = await fetch('/api/lists')
+          const listsRes = await orgFetch('/api/lists')
           if (listsRes.ok) {
             const listsData = await listsRes.json()
             if (listsData.success && listsData.data) {

@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Users, ChevronLeft, ChevronRight, Loader2, Trash2 } from 'lucide-react'
 import type { List } from '@/lib/types/list'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Contact {
   id: string
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export function ListDetailDialog({ list, open, onClose, onUpdate }: Props) {
+  const orgFetch = useOrgFetch();
   const [contacts, setContacts] = useState<Contact[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -101,7 +103,7 @@ export function ListDetailDialog({ list, open, onClose, onUpdate }: Props) {
 
     setIsRemoving(true)
     try {
-      const response = await fetch(`/api/lists/${list.id}/contacts`, {
+      const response = await orgFetch(`/api/lists/${list.id}/contacts`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact_ids: selectedIds })

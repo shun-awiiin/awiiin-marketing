@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { updateScenarioSchema } from '@/lib/validation/l-step'
 
 // GET /api/scenarios/[id] - Get scenario details
@@ -9,33 +10,30 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { data: scenario, error } = await supabase
       .from('scenarios')
-      .select(`
-        *,
-        scenario_steps(*)
-      `)
+      .select(`*, scenario_steps(*)`)
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (error || !scenario) {
       return NextResponse.json({ success: false, error: 'シナリオが見つかりません' }, { status: 404 })
     }
 
-    // Sort steps by order
     const sortedSteps = (scenario.scenario_steps || []).sort(
       (a: { step_order: number }, b: { step_order: number }) => a.step_order - b.step_order
     )
 
-    // Get stats
     const { data: stats } = await supabase.rpc('get_scenario_stats', {
       p_scenario_id: id
     })
@@ -54,7 +52,7 @@ export async function GET(
         }
       }
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -66,12 +64,14 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const body = await request.json()
     const validation = updateScenarioSchema.safeParse(body)
@@ -83,12 +83,11 @@ export async function PUT(
       }, { status: 400 })
     }
 
-    // Verify ownership
     const { data: existing } = await supabase
       .from('scenarios')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!existing) {
@@ -107,7 +106,7 @@ export async function PUT(
     }
 
     return NextResponse.json({ success: true, data })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -119,19 +118,20 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
 
-    // Verify ownership
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
+
     const { data: existing } = await supabase
       .from('scenarios')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single()
 
     if (!existing) {
@@ -148,7 +148,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

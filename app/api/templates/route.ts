@@ -1,25 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 import type { TemplateType } from '@/lib/types/database';
 
 // GET /api/templates - List templates
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
+    const supabase = await createServiceClient();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') as TemplateType | null;
 
-    // Get presets and user's custom templates
+    // Get presets and user/org's custom templates
+    const userFilter = ctx.orgId
+      ? `is_preset.eq.true,organization_id.eq.${ctx.orgId}`
+      : `is_preset.eq.true,user_id.eq.${ctx.user.id}`;
+
     let query = supabase
       .from('templates')
       .select('*')
-      .or(`is_preset.eq.true,user_id.eq.${user.id}`)
+      .or(userFilter)
       .eq('is_active', true)
       .order('is_preset', { ascending: false })
       .order('name');
@@ -35,8 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: templates });
-  } catch (error) {
-    console.error('Templates fetch error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -44,13 +47,12 @@ export async function GET(request: NextRequest) {
 // POST /api/templates - Create custom template
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
+    const supabase = await createServiceClient();
     const body = await request.json();
     const { name, type, subject_variants, body_text } = body;
 
@@ -65,7 +67,8 @@ export async function POST(request: NextRequest) {
     const { data: template, error } = await supabase
       .from('templates')
       .insert({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         name,
         type,
         category: 'custom',
@@ -82,8 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ data: template }, { status: 201 });
-  } catch (error) {
-    console.error('Create template error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

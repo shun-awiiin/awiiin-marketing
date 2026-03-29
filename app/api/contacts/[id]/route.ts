@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 
 // GET /api/contacts/:id - Get single contact
 export async function GET(
@@ -8,18 +9,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
+
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const { data: contact, error } = await supabase
       .from('contacts')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single();
 
     if (error || !contact) {
@@ -37,8 +40,7 @@ export async function GET(
     return NextResponse.json({
       data: { ...contact, tags }
     });
-  } catch (error) {
-    console.error('Get contact error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -50,12 +52,14 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
+
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const body = await request.json();
     const { first_name, company, status, tag_ids } = body;
@@ -65,7 +69,7 @@ export async function PATCH(
       .from('contacts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single();
 
     if (!existing) {
@@ -91,10 +95,7 @@ export async function PATCH(
 
     // Update tags if provided
     if (tag_ids !== undefined) {
-      // Remove existing tags
       await supabase.from('contact_tags').delete().eq('contact_id', id);
-
-      // Add new tags
       if (tag_ids.length > 0) {
         const tagInserts = tag_ids.map((tagId: string) => ({
           contact_id: id,
@@ -115,8 +116,7 @@ export async function PATCH(
     return NextResponse.json({
       data: { ...contact, tags }
     });
-  } catch (error) {
-    console.error('Update contact error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -128,27 +128,27 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    // Verify ownership and delete
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
+
     const { error } = await supabase
       .from('contacts')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id);
+      .eq(filterCol, filterVal);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ data: { success: true } });
-  } catch (error) {
-    console.error('Delete contact error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

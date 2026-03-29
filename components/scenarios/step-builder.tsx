@@ -25,6 +25,7 @@ import {
   ChevronDown
 } from 'lucide-react'
 import type { ScenarioStep, StepType } from '@/lib/types/l-step'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Props {
   scenarioId: string
@@ -51,6 +52,7 @@ const stepTypeIcons: Record<StepType, React.ReactNode> = {
 }
 
 export function StepBuilder({ scenarioId, steps, onStepsChange, tags, customFields }: Props) {
+  const orgFetch = useOrgFetch();
   const [isAddingStep, setIsAddingStep] = useState(false)
   const [editingStep, setEditingStep] = useState<ScenarioStep | null>(null)
   const [newStepType, setNewStepType] = useState<StepType>('email')
@@ -59,7 +61,7 @@ export function StepBuilder({ scenarioId, steps, onStepsChange, tags, customFiel
 
   const handleAddStep = async () => {
     try {
-      const response = await fetch(`/api/scenarios/${scenarioId}/steps`, {
+      const response = await orgFetch(`/api/scenarios/${scenarioId}/steps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

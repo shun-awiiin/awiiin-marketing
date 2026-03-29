@@ -47,6 +47,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/webhooks') ||
     request.nextUrl.pathname.startsWith('/api/forms/public') ||
     request.nextUrl.pathname.startsWith('/api/chat/public') ||
+    request.nextUrl.pathname.startsWith('/api/chat/upload') ||
     request.nextUrl.pathname.startsWith('/api/calendar/callback')
 
   if (!user && !isPublicPath) {

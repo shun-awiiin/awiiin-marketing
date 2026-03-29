@@ -29,6 +29,7 @@ import {
 import { ja } from 'date-fns/locale'
 import { EventDetailDialog } from './event-detail-dialog'
 import type { CalendarEventWithContacts } from '@/lib/types/calendar'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 // ============================================
 // TYPES
@@ -41,6 +42,7 @@ type ViewMode = 'month' | 'week'
 // ============================================
 
 export function CalendarView() {
+  const orgFetch = useOrgFetch();
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [events, setEvents] = useState<CalendarEventWithContacts[]>([])
@@ -63,7 +65,7 @@ export function CalendarView() {
         per_page: '100',
       })
 
-      const res = await fetch(`/api/calendar/events?${params.toString()}`)
+      const res = await orgFetch(`/api/calendar/events?${params.toString()}`)
       if (res.ok) {
         const json = await res.json()
         setEvents(json.data || [])
@@ -82,7 +84,7 @@ export function CalendarView() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      await fetch('/api/calendar/sync', {
+      await orgFetch('/api/calendar/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: false }),

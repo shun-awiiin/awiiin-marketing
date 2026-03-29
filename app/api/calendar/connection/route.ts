@@ -10,24 +10,23 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { CalendarSettingsSchema } from '@/lib/types/calendar'
 import type { CalendarConnectionStatus } from '@/lib/types/calendar'
 
-export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+export async function GET(request: NextRequest) {
+  const ctx = await getOrgContext(request)
+  if (isOrgContextError(ctx)) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
   }
+
+  const supabase = await createServiceClient()
 
   const { data: connection } = await supabase
     .from('calendar_connections')
     .select('google_email, sync_enabled, last_synced_at, calendar_id')
-    .eq('user_id', user.id)
+    .eq('user_id', ctx.user.id)
     .single()
 
   const status: CalendarConnectionStatus = {
@@ -41,20 +40,18 @@ export async function GET() {
   return NextResponse.json(status)
 }
 
-export async function DELETE() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+export async function DELETE(request: NextRequest) {
+  const ctx = await getOrgContext(request)
+  if (isOrgContextError(ctx)) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
   }
+
+  const supabase = await createServiceClient()
 
   const { error } = await supabase
     .from('calendar_connections')
     .delete()
-    .eq('user_id', user.id)
+    .eq('user_id', ctx.user.id)
 
   if (error) {
     return NextResponse.json(
@@ -67,14 +64,12 @@ export async function DELETE() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+  const ctx = await getOrgContext(request)
+  if (isOrgContextError(ctx)) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
   }
+
+  const supabase = await createServiceClient()
 
   const body = await request.json()
   const parsed = CalendarSettingsSchema.safeParse(body)
@@ -92,7 +87,7 @@ export async function PATCH(request: NextRequest) {
       sync_enabled: parsed.data.sync_enabled,
       calendar_id: parsed.data.calendar_id,
     })
-    .eq('user_id', user.id)
+    .eq('user_id', ctx.user.id)
 
   if (error) {
     return NextResponse.json(

@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 import type { CampaignStatus, TemplateType } from '@/lib/types/database';
 import { CreateCampaignSchema } from '@/lib/types/database';
 
 // GET /api/campaigns - List campaigns
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
+
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as CampaignStatus | null;
@@ -25,7 +28,7 @@ export async function GET(request: NextRequest) {
         *,
         templates(id, name, type)
       `, { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);
 
@@ -49,13 +52,8 @@ export async function GET(request: NextRequest) {
 
         const statusCounts = {
           total: stats?.length || 0,
-          queued: 0,
-          sending: 0,
-          sent: 0,
-          delivered: 0,
-          bounced: 0,
-          complained: 0,
-          failed: 0
+          queued: 0, sending: 0, sent: 0, delivered: 0,
+          bounced: 0, complained: 0, failed: 0
         };
 
         stats?.forEach(m => {
@@ -81,14 +79,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: campaignsWithStats,
-      meta: {
-        total: count || 0,
-        page,
-        per_page: perPage
-      }
+      meta: { total: count || 0, page, per_page: perPage }
     });
-  } catch (error) {
-    console.error('Campaigns fetch error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -96,16 +89,16 @@ export async function GET(request: NextRequest) {
 // POST /api/campaigns - Create campaign
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    const body = await request.json();
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
-    // Validate input
+    const body = await request.json();
     const validation = CreateCampaignSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json({
@@ -115,19 +108,10 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      name,
-      type,
-      template_id,
-      input_payload,
-      subject_index,
-      filter_tag_ids,
-      from_name,
-      from_email,
-      schedule_type,
-      scheduled_at
+      name, type, template_id, input_payload, subject_index,
+      filter_tag_ids, from_name, from_email, schedule_type, scheduled_at
     } = validation.data;
 
-    // Get template
     const { data: template, error: templateError } = await supabase
       .from('templates')
       .select('*')
@@ -138,7 +122,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
 
-    // Generate subject from selected variant
     const subjectVariants = template.subject_variants as string[];
     const selectedSubject = subjectVariants[subject_index] || subjectVariants[0];
 
@@ -148,7 +131,7 @@ export async function POST(request: NextRequest) {
       const { count } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq(filterCol, filterVal)
         .eq('status', 'active');
       audienceCount = count || 0;
     } else {
@@ -158,30 +141,28 @@ export async function POST(request: NextRequest) {
         .in('tag_id', filter_tag_ids);
 
       const uniqueIds = [...new Set(contactIds?.map(c => c.contact_id) || [])];
-
       if (uniqueIds.length > 0) {
         const { count } = await supabase
           .from('contacts')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq(filterCol, filterVal)
           .eq('status', 'active')
           .in('id', uniqueIds);
         audienceCount = count || 0;
       }
     }
 
-    // Check max recipients
     if (audienceCount > 5000) {
       return NextResponse.json({
         error: 'Audience exceeds maximum of 5,000 recipients'
       }, { status: 400 });
     }
 
-    // Create campaign
     const { data: campaign, error } = await supabase
       .from('campaigns')
       .insert({
-        user_id: user.id,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
         name,
         template_id,
         type: type as TemplateType,
@@ -203,13 +184,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: {
-        ...campaign,
-        audience_count: audienceCount
-      }
+      data: { ...campaign, audience_count: audienceCount }
     }, { status: 201 });
-  } catch (error) {
-    console.error('Create campaign error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

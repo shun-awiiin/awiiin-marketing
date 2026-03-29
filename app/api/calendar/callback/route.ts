@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import {
   exchangeCodeForTokens,
   getGoogleUserEmail,
@@ -63,26 +63,29 @@ export async function GET(request: NextRequest) {
     ).toISOString()
 
     // Store connection in DB
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
+
+    // Delete existing connection for this user, then insert fresh
+    await supabase
+      .from('calendar_connections')
+      .delete()
+      .eq('user_id', userId)
 
     const { error: dbError } = await supabase
       .from('calendar_connections')
-      .upsert(
-        {
-          user_id: userId,
-          access_token_encrypted: accessTokenEncrypted,
-          refresh_token_encrypted: refreshTokenEncrypted,
-          token_expires_at: tokenExpiresAt,
-          calendar_id: 'primary',
-          sync_enabled: true,
-          google_email: googleEmail,
-        },
-        { onConflict: 'user_id' }
-      )
+      .insert({
+        user_id: userId,
+        access_token_encrypted: accessTokenEncrypted,
+        refresh_token_encrypted: refreshTokenEncrypted,
+        token_expires_at: tokenExpiresAt,
+        calendar_id: 'primary',
+        sync_enabled: true,
+        google_email: googleEmail,
+      })
 
     if (dbError) {
       return NextResponse.redirect(
-        `${baseUrl}/dashboard/calendar/settings?error=db_error`
+        `${baseUrl}/dashboard/calendar/settings?error=db_error&detail=${encodeURIComponent(dbError.message)}`
       )
     }
 
@@ -94,9 +97,10 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('calendar_oauth_user')
 
     return response
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown'
     return NextResponse.redirect(
-      `${baseUrl}/dashboard/calendar/settings?error=token_exchange_failed`
+      `${baseUrl}/dashboard/calendar/settings?error=token_exchange_failed&detail=${encodeURIComponent(msg)}`
     )
   }
 }

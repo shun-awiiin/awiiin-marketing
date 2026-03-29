@@ -14,6 +14,7 @@ import {
   Check,
   X,
 } from 'lucide-react'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface ContactNotesProps {
   contactId: string
@@ -21,6 +22,7 @@ interface ContactNotesProps {
 }
 
 export function ContactNotes({ contactId, initialNotes }: ContactNotesProps) {
+  const orgFetch = useOrgFetch();
   const [notes, setNotes] = useState<ContactNote[]>(initialNotes)
   const [newContent, setNewContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -32,7 +34,7 @@ export function ContactNotes({ contactId, initialNotes }: ContactNotesProps) {
     if (!newContent.trim()) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/contacts/${contactId}/notes`, {
+      const res = await orgFetch(`/api/contacts/${contactId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newContent.trim() }),
@@ -63,7 +65,7 @@ export function ContactNotes({ contactId, initialNotes }: ContactNotesProps) {
   const saveEdit = useCallback(async (noteId: string) => {
     if (!editContent.trim()) return
     try {
-      const res = await fetch(`/api/contacts/${contactId}/notes`, {
+      const res = await orgFetch(`/api/contacts/${contactId}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note_id: noteId, content: editContent.trim() }),
@@ -87,7 +89,7 @@ export function ContactNotes({ contactId, initialNotes }: ContactNotesProps) {
   // ---- Delete ----
   const handleDelete = useCallback(async (noteId: string) => {
     try {
-      const res = await fetch(`/api/contacts/${contactId}/notes`, {
+      const res = await orgFetch(`/api/contacts/${contactId}/notes`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note_id: noteId }),

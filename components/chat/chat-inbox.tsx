@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Send, CheckCircle, XCircle, MessageSquare } from "lucide-react"
+import { Send, CheckCircle, XCircle, MessageSquare, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ChatConversationList } from "./chat-conversation-list"
 import { ChatMessageThread } from "./chat-message-thread"
 import type { ChatMessage, ConversationStatus } from "@/lib/types/chat"
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface ConversationWithMeta {
   id: string
@@ -42,6 +43,7 @@ interface ChatInboxProps {
 }
 
 export function ChatInbox({ initialConversations, userId }: ChatInboxProps) {
+  const orgFetch = useOrgFetch();
   const [conversations, setConversations] = useState<ConversationWithMeta[]>(
     initialConversations as unknown as ConversationWithMeta[]
   )
@@ -125,7 +127,7 @@ export function ChatInbox({ initialConversations, userId }: ChatInboxProps) {
     async (status: ConversationStatus) => {
       if (!selectedId) return
       try {
-        const res = await fetch(`/api/chat/conversations/${selectedId}`, {
+        const res = await orgFetch(`/api/chat/conversations/${selectedId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
@@ -141,6 +143,23 @@ export function ChatInbox({ initialConversations, userId }: ChatInboxProps) {
     },
     [selectedId]
   )
+
+  const handleDelete = useCallback(async () => {
+    if (!selectedId) return
+    if (!window.confirm("この会話を削除しますか？この操作は取り消せません。")) return
+    try {
+      const res = await orgFetch(`/api/chat/conversations/${selectedId}`, {
+        method: "DELETE",
+      })
+      if (res.ok) {
+        setConversations((prev) => prev.filter((c) => c.id !== selectedId))
+        setSelectedId(null)
+        setMessages([])
+      }
+    } catch {
+      // Network error
+    }
+  }, [selectedId])
 
   // Supabase realtime subscription for new messages
   useEffect(() => {
@@ -248,30 +267,40 @@ export function ChatInbox({ initialConversations, userId }: ChatInboxProps) {
                   {selectedConversation.status === "closed" && "クローズ"}
                 </Badge>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    ステータス変更
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleStatusChange("open")}>
-                    未対応に戻す
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleStatusChange("resolved")}
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    解決済みにする
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleStatusChange("closed")}
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    クローズする
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      ステータス変更
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleStatusChange("open")}>
+                      未対応に戻す
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleStatusChange("resolved")}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      解決済みにする
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleStatusChange("closed")}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      クローズする
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Messages */}

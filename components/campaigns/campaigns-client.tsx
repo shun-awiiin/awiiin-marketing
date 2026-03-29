@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Search, MoreHorizontal, Eye, Trash2, Send, Pause, Play, Users, List, Filter, Tag, Mail } from "lucide-react";
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Campaign {
   id: string;
@@ -63,6 +64,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const supabase = createClient();
+  const orgFetch = useOrgFetch();
 
   const filteredCampaigns = campaigns.filter((campaign) =>
     campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -89,7 +91,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
     setBulkDeleteLoading(true);
 
     try {
-      const response = await fetch("/api/campaigns/bulk-delete", {
+      const response = await orgFetch("/api/campaigns/bulk-delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selectedCampaigns }),
@@ -129,7 +131,7 @@ export function CampaignsClient({ campaigns: initialCampaigns }: CampaignsClient
 
     try {
       // キューイングAPIを呼び出し
-      const response = await fetch(`/api/campaigns/${id}/queue`, {
+      const response = await orgFetch(`/api/campaigns/${id}/queue`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });

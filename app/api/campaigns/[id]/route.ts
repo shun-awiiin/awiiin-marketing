@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context';
 
 // GET /api/campaigns/:id - Get campaign details
 export async function GET(
@@ -8,28 +9,26 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
+
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
 
     const { data: campaign, error } = await supabase
       .from('campaigns')
-      .select(`
-        *,
-        templates(*)
-      `)
+      .select(`*, templates(*)`)
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single();
 
     if (error || !campaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    // Get stats
     const { data: messages } = await supabase
       .from('messages')
       .select('status')
@@ -37,13 +36,8 @@ export async function GET(
 
     const statusCounts = {
       total: messages?.length || 0,
-      queued: 0,
-      sending: 0,
-      sent: 0,
-      delivered: 0,
-      bounced: 0,
-      complained: 0,
-      failed: 0
+      queued: 0, sending: 0, sent: 0, delivered: 0,
+      bounced: 0, complained: 0, failed: 0
     };
 
     messages?.forEach(m => {
@@ -66,8 +60,7 @@ export async function GET(
         }
       }
     });
-  } catch (error) {
-    console.error('Get campaign error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -79,19 +72,20 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    // Verify ownership and status
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
+
     const { data: existing } = await supabase
       .from('campaigns')
       .select('status')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single();
 
     if (!existing) {
@@ -124,8 +118,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data: campaign });
-  } catch (error) {
-    console.error('Update campaign error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -137,26 +130,26 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const ctx = await getOrgContext(request);
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     }
 
-    // Verify ownership
+    const supabase = await createServiceClient();
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id';
+    const filterVal = ctx.orgId || ctx.user.id;
+
     const { data: existing } = await supabase
       .from('campaigns')
       .select('status')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .single();
 
     if (!existing) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    // Cannot delete active campaigns
     if (['sending', 'queued'].includes(existing.status)) {
       return NextResponse.json({ error: 'Cannot delete active campaigns' }, { status: 400 });
     }
@@ -171,8 +164,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ data: { success: true } });
-  } catch (error) {
-    console.error('Delete campaign error:', error);
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

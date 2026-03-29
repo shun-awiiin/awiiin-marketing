@@ -8,7 +8,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       display: flex;
       align-items: center;
@@ -17,22 +17,25 @@
     }
     .demo-content {
       text-align: center;
-      opacity: 0.7;
+      opacity: 0.5;
     }
-    .demo-content h1 { font-size: 24px; margin-bottom: 8px; }
-    .demo-content p { font-size: 14px; }
+    .demo-content h1 { font-size: 20px; margin-bottom: 4px; }
+    .demo-content p { font-size: 13px; }
   </style>
 </head>
 <body>
   <div class="demo-content">
-    <h1>Bee Marketing</h1>
-    <p>Chat Widget Preview</p>
+    <h1>Website Preview</h1>
+    <p>Chat widget is in the bottom-right corner</p>
   </div>
   <script
     src="./chat-widget.js"
     data-widget-id="preview-test"
     data-position="bottom-right"
     data-color="#F8A826"
+    data-name="Bee Support"
+    data-welcome="Welcome! We're here to help you with any questions about Bee.&#10;&#10;Business hours: 10:00 - 18:00&#10;We'll get back to you on the next business day for after-hours inquiries."
+    data-placeholder="Type your message..."
     async
     defer
   ></script>

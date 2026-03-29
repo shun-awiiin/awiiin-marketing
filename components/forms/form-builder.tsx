@@ -206,15 +206,15 @@ export function FormBuilder({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="notify-email">通知先メール（任意）</Label>
+              <Label htmlFor="notify-email">通知先メール（任意・カンマ区切りで複数可）</Label>
               <Input
                 id="notify-email"
-                type="email"
+                type="text"
                 value={settings.notifyEmail || ""}
                 onChange={(e) =>
                   updateSetting("notifyEmail", e.target.value || null)
                 }
-                placeholder="admin@example.com"
+                placeholder="user1@example.com, user2@example.com"
               />
             </div>
           </CardContent>

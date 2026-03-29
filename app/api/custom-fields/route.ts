@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgContext, isOrgContextError } from '@/lib/auth/get-org-context'
 import { createCustomFieldSchema } from '@/lib/validation/l-step'
 
 // GET /api/custom-fields - List custom fields
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
+
+    const supabase = await createServiceClient()
+    const filterCol = ctx.orgId ? 'organization_id' : 'user_id'
+    const filterVal = ctx.orgId || ctx.user.id
 
     const { data, error } = await supabase
       .from('custom_fields')
       .select('*')
-      .eq('user_id', user.id)
+      .eq(filterCol, filterVal)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -23,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -31,13 +34,12 @@ export async function GET(request: NextRequest) {
 // POST /api/custom-fields - Create custom field
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 })
+    const ctx = await getOrgContext(request)
+    if (isOrgContextError(ctx)) {
+      return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status })
     }
 
+    const supabase = await createServiceClient()
     const body = await request.json()
     const validation = createCustomFieldSchema.safeParse(body)
 
@@ -50,7 +52,11 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('custom_fields')
-      .insert({ ...validation.data, user_id: user.id })
+      .insert({
+        ...validation.data,
+        user_id: ctx.user.id,
+        organization_id: ctx.orgId,
+      })
       .select()
       .single()
 
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

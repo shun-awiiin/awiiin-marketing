@@ -42,12 +42,18 @@ export interface ChatVisitor {
   name: string | null
 }
 
+export interface ChatMessageMetadata {
+  image_url?: string
+  [key: string]: unknown
+}
+
 export interface ChatMessage {
   id: string
   conversation_id: string
   role: MessageRole
   sender_id: string | null
   content: string
+  metadata: ChatMessageMetadata | null
   read_at: string | null
   created_at: string
 }

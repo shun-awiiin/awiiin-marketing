@@ -12,6 +12,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, ListIcon } from 'lucide-react'
 import type { List } from '@/lib/types/list'
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Props {
   contactIds: string[]
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function ListAssignDialog({ contactIds, open, onClose, onComplete }: Props) {
+  const orgFetch = useOrgFetch();
   const [lists, setLists] = useState<List[]>([])
   const [selectedListIds, setSelectedListIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -36,7 +38,7 @@ export function ListAssignDialog({ contactIds, open, onClose, onComplete }: Prop
   const fetchLists = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/lists')
+      const response = await orgFetch('/api/lists')
       const result = await response.json()
 
       if (result.success) {
@@ -67,7 +69,7 @@ export function ListAssignDialog({ contactIds, open, onClose, onComplete }: Prop
     try {
       const results = await Promise.all(
         selectedListIds.map(listId =>
-          fetch(`/api/lists/${listId}/contacts`, {
+          orgFetch(`/api/lists/${listId}/contacts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contact_ids: contactIds })

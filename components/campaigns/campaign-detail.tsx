@@ -50,6 +50,7 @@ import type {
   SeminarInvitePayload,
   FreeTrialInvitePayload,
 } from "@/lib/types/database";
+import { useOrgFetch } from "@/lib/hooks/use-org-fetch";
 
 interface Campaign {
   id: string;
@@ -101,6 +102,7 @@ interface CampaignDetailProps {
 }
 
 export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProps) {
+  const orgFetch = useOrgFetch();
   const [currentStatus, setCurrentStatus] = useState(campaign.status);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
@@ -137,7 +139,7 @@ export function CampaignDetail({ campaign, messages, stats }: CampaignDetailProp
       setCurrentStatus("sending");
 
       // 送信プロセスを呼び出し（同期的に待つ）
-      const response = await fetch("/api/campaigns/send", {
+      const response = await orgFetch("/api/campaigns/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaignId: campaign.id }),
